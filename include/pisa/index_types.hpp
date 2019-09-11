@@ -15,6 +15,7 @@
 
 #include "binary_freq_collection.hpp"
 #include "block_freq_index.hpp"
+#include "multi_freq_index.hpp"
 
 #include "freq_index.hpp"
 #include "mixed_block.hpp"

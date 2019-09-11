@@ -107,8 +107,8 @@ target_link_libraries(extract_topics
   CLI11
 )
 
-add_executable(sample_inverted_index sample_inverted_index.cpp)
-target_link_libraries(sample_inverted_index
+add_executable(create_multi_freq_index create_multi_freq_index.cpp)
+target_link_libraries(create_multi_freq_index
   pisa
   CLI11
 )
