@@ -20,11 +20,20 @@
 
 #include "CLI/CLI.hpp"
 
+using namespace pisa;
+
+void write_codec_stats(ofstream &output, std::vector<CodecTypes> &codecs) {
+    std::copy(codecs.rbegin(), codecs.rend(),
+          std::ostream_iterator<int>(output, " "));
+    output << "\n";
+}
+
 template <typename InputCollection, typename CollectionType, typename Scorer = pisa::bm25>
 void create_collection(InputCollection const &input,
                        pisa::global_parameters const &params,
                        const std::optional<std::string> &output_filename,
-                       bool check) {
+                       bool stats = false,
+                       bool check = true) {
     using namespace pisa;
     std::string const seq_type = "Multicompression";
     spdlog::info("Processing {} documents", input.num_docs());
@@ -35,15 +44,27 @@ void create_collection(InputCollection const &input,
     size_t postings = 0;
     {
         pisa::progress progress("Create index", input.size());
+        ofstream doc_codecs_output{output_filename.value() + ".codecs.docs"};
+        ofstream freq_codecs_output{output_filename.value() + ".codecs.freqs"};
+
         for (auto const &plist : input) {
             uint64_t freqs_sum;
             size = plist.docs.size();
             freqs_sum = std::accumulate(plist.freqs.begin(), plist.freqs.begin() + size, uint64_t(0));
-            builder.add_posting_list(size, plist.docs.begin(), plist.freqs.begin(), freqs_sum);
+            auto [doc_codecs, freq_codecs] =
+                builder.add_posting_list(size, plist.docs.begin(), plist.freqs.begin(), freqs_sum);
 
+            if (stats) {
+                write_codec_stats(doc_codecs_output, doc_codecs);
+                write_codec_stats(freq_codecs_output, freq_codecs); 
+            }
+            
             progress.update(1);
             postings += size;
         }
+
+        doc_codecs_output.close();
+        freq_codecs_output.close();
     }
 
     CollectionType coll;
@@ -84,7 +105,7 @@ int main(int argc, char **argv) {
     params.log_partition_size = configuration::get().log_partition_size;
 
     using coll_type = multi_freq_index<false>;
-    create_collection<binary_freq_collection, coll_type>(input, params, output_filename, check);
+    create_collection<binary_freq_collection, coll_type>(input, params, output_filename, true, check);
 
     return 0;
 }
