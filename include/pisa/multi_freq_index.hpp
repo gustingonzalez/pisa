@@ -25,12 +25,15 @@ namespace pisa {
             }
 
             template <typename DocsIterator, typename FreqsIterator>
-            void add_posting_list(uint64_t n, DocsIterator docs_begin,
+            auto add_posting_list(uint64_t n, DocsIterator docs_begin,
                                   FreqsIterator freqs_begin, uint64_t /* occurrences */)
+            -> std::pair<std::vector<CodecTypes>, std::vector<CodecTypes> >
             {
                 if (!n) throw std::invalid_argument("List must be nonempty");
-                posting_list<Profile>::write(m_lists, n, docs_begin, freqs_begin);
+                auto [doc_codecs, freq_codecs] =
+                    posting_list<Profile>::write(m_lists, n, docs_begin, freqs_begin);
                 m_endpoints.push_back(m_lists.size());
+                return {doc_codecs, freq_codecs};
             }
             
             /*template <typename BlockDataRange>

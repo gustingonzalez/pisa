@@ -6,27 +6,31 @@
 
 namespace pisa {
 
-    template <bool Profile=false>
+    enum CodecTypes
+    {
+        block_varintg8iu,
+        block_streamvbyte,
+        block_maskedvbyte,
+        block_varintgb,
+        block_interpolative,
+        block_qmx,
+        block_simple8b,
+        block_simple16,
+        block_simdbp,
+        block_optpfor
+    };
+
+    template <bool Profile = false>
     struct posting_list {
-
-        enum CodecTypes
-        {
-            block_varintg8iu,
-            block_streamvbyte,
-            block_maskedvbyte,
-            block_varintgb,
-            block_interpolative,
-            block_qmx,
-            block_simple8b,
-            block_simple16,
-            block_simdbp,
-            block_optpfor
-        };
-
         static const uint64_t block_size = 128;
         template <typename DocsIterator, typename FreqsIterator>
-        static void write(std::vector<uint8_t>& out, uint32_t n,
-                          DocsIterator docs_begin, FreqsIterator freqs_begin) {
+        // Returns <used doc codecs, used freq codecs>
+        auto static write(std::vector<uint8_t> &out,
+                          uint32_t n,
+                          DocsIterator docs_begin,
+                          FreqsIterator freqs_begin)
+            -> std::pair<std::vector<CodecTypes>, std::vector<CodecTypes>>
+        {
             TightVariableByte::encode_single(n, out);
 
             // uint64_t block_size = BlockCodec::block_size;
@@ -43,11 +47,13 @@ namespace pisa {
             uint32_t last_doc(-1);
             uint32_t block_base = 0;
 
+            std::vector<CodecTypes> doc_codecs;
+            std::vector<CodecTypes> freq_codecs;
+
             // Foreach block...
             for (size_t b = 0; b < blocks; ++b) {
                 uint32_t cur_block_size =
-                    ((b + 1) * block_size <= n)
-                    ? block_size : (n % block_size);
+                    ((b + 1) * block_size <= n) ? block_size : (n % block_size);
 
                 // Foreach cell of b-th block...
                 for (size_t i = 0; i < cur_block_size; ++i) {
@@ -57,17 +63,21 @@ namespace pisa {
 
                     freqs_buf[i] = *freqs_it++ - 1;
                 }
-                *((uint32_t*)&out[begin_block_maxs + 4 * b]) = last_doc;
+                *((uint32_t *)&out[begin_block_maxs + 4 * b]) = last_doc;
 
-                encode(docs_buf.data(), last_doc - block_base - (cur_block_size - 1),
-                                   cur_block_size, out);
-                encode(freqs_buf.data(), uint32_t(-1), cur_block_size, out);
-                
+                doc_codecs.push_back(encode(docs_buf.data(),
+                                            last_doc - block_base - (cur_block_size - 1),
+                                            cur_block_size,
+                                            out));
+                freq_codecs.push_back(encode(freqs_buf.data(), uint32_t(-1), cur_block_size, out));
+
                 if (b != blocks - 1) {
-                    *((uint32_t*)&out[begin_block_endpoints + 4 * b]) = out.size() - begin_blocks;
+                    *((uint32_t *)&out[begin_block_endpoints + 4 * b]) = out.size() - begin_blocks;
                 }
                 block_base = last_doc + 1;
             }
+
+            return {doc_codecs, freq_codecs};
         }
 
         template <typename BlockDataRange>
@@ -99,7 +109,7 @@ namespace pisa {
             }
         }
 
-        static void encode(uint32_t const* in, uint32_t sum_of_values,
+        static CodecTypes encode(uint32_t const* in, uint32_t sum_of_values,
                            size_t n, std::vector<uint8_t>& out)
         {
             std::vector<std::vector<uint8_t> > encodes(10);
@@ -133,6 +143,7 @@ namespace pisa {
             size_t out_len = encodes[codec].size();
             TightVariableByte::encode_single(codec, out);
             out.insert(out.end(), encodes[codec].data(), encodes[codec].data() + out_len);
+            return static_cast<CodecTypes>(codec);
         }
 
         class document_enumerator {
