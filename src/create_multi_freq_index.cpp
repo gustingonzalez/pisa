@@ -10,7 +10,6 @@
 
 #include "mappable/mapper.hpp"
 
-#include "scorer/bm25.hpp"
 #include "configuration.hpp"
 #include "util/index_build_utils.hpp"
 #include "index_types.hpp"
@@ -28,7 +27,7 @@ void write_codec_stats(ofstream &output, std::vector<CodecTypes> &codecs) {
     output << "\n";
 }
 
-template <typename InputCollection, typename CollectionType, typename Scorer = pisa::bm25>
+template <typename InputCollection, typename CollectionType>
 void create_collection(InputCollection const &input,
                        pisa::global_parameters const &params,
                        const std::optional<std::string> &output_filename,
