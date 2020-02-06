@@ -139,9 +139,9 @@ namespace pisa {
             };
 
             // Gets codec (index). TODO: test this!
-            int codec = std::min_element(sizes.begin(), sizes.end()) - sizes.begin();
+            uint8_t codec = std::min_element(sizes.begin(), sizes.end()) - sizes.begin();
             size_t out_len = encodes[codec].size();
-            TightVariableByte::encode_single(codec, out);
+            out.push_back(codec);
             out.insert(out.end(), encodes[codec].data(), encodes[codec].data() + out_len);
             return static_cast<CodecTypes>(codec);
         }
@@ -357,9 +357,7 @@ namespace pisa {
 
             uint8_t const* decode(uint8_t const* in, uint32_t* out, uint32_t sum_of_values, size_t n) const
             {
-                uint32_t codec;
-                in = TightVariableByte::decode(in, &codec, 1);
-
+                uint8_t codec = *in++;
                 switch(codec) {
                     case block_varintg8iu:
                         in = varint_G8IU_block::decode(in, out, sum_of_values, n);
@@ -459,7 +457,7 @@ namespace pisa {
             std::vector<uint32_t> m_freqs_buf;
 
             block_profiler::counter_type* m_block_profile;
-        };
+       };
 
     };
 }
