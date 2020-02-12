@@ -64,12 +64,20 @@ namespace pisa {
                     freqs_buf[i] = *freqs_it++ - 1;
                 }
                 *((uint32_t *)&out[begin_block_maxs + 4 * b]) = last_doc;
-
-                doc_codecs.push_back(encode(docs_buf.data(),
-                                            last_doc - block_base - (cur_block_size - 1),
-                                            cur_block_size,
-                                            out));
-                freq_codecs.push_back(encode(freqs_buf.data(), uint32_t(-1), cur_block_size, out));
+                
+                // Reserves space for codecs.
+                size_t codecs_index = out.size();
+                out.push_back(0);
+                
+                uint8_t doc_codec = encode(docs_buf.data(), last_doc - block_base - (cur_block_size - 1),
+                                        cur_block_size, out);
+                uint8_t freq_codec = encode(freqs_buf.data(), uint32_t(-1), cur_block_size, out);
+                
+                // Saves codecs.
+                out[codecs_index] += doc_codec + (freq_codec << 4);
+                
+                doc_codecs.push_back(static_cast<CodecTypes>(doc_codec));
+                freq_codecs.push_back(static_cast<CodecTypes>(freq_codec));
 
                 if (b != blocks - 1) {
                     *((uint32_t *)&out[begin_block_endpoints + 4 * b]) = out.size() - begin_blocks;
@@ -109,7 +117,7 @@ namespace pisa {
             }
         }
 
-        static CodecTypes encode(uint32_t const* in, uint32_t sum_of_values,
+        static uint8_t encode(uint32_t const* in, uint32_t sum_of_values,
                            size_t n, std::vector<uint8_t>& out)
         {
             std::vector<std::vector<uint8_t> > encodes(10);
@@ -141,9 +149,8 @@ namespace pisa {
             // Gets codec (index). TODO: test this!
             uint8_t codec = std::min_element(sizes.begin(), sizes.end()) - sizes.begin();
             size_t out_len = encodes[codec].size();
-            out.push_back(codec);
             out.insert(out.end(), encodes[codec].data(), encodes[codec].data() + out_len);
-            return static_cast<CodecTypes>(codec);
+            return codec;
         }
 
         class document_enumerator {
@@ -251,7 +258,7 @@ namespace pisa {
                 return m_blocks;
             }
 
-            uint64_t stats_freqs_size() const
+            uint64_t stats_freqs_size()
             {
                 // XXX rewrite in terms of get_blocks()
                 uint64_t bytes = 0;
@@ -264,12 +271,14 @@ namespace pisa {
                         ? block_size : (size() % block_size);
 
                     uint32_t cur_base = (b ? block_max(b - 1) : uint32_t(-1)) + 1;
+                    unpack_codecs(ptr);
+                    ptr++;
                     uint8_t const* freq_ptr =
-                       decode(ptr, buf.data(),
-                                           block_max(b) - cur_base - (cur_block_size - 1),
-                                           cur_block_size);
-                    ptr = decode(freq_ptr, buf.data(),
-                                             uint32_t(-1), cur_block_size);
+                       decode(cur_doc_codec, ptr, buf.data(),
+                              block_max(b) - cur_base - (cur_block_size - 1),
+                              cur_block_size);
+                    ptr = decode(cur_freq_codec, freq_ptr, buf.data(),
+                                 uint32_t(-1), cur_block_size);
                     bytes += ptr - freq_ptr;
                 }
 
@@ -336,11 +345,13 @@ namespace pisa {
                     blocks.back().doc_gaps_universe = gaps_universe;
                     blocks.back().max = block_max(b);
 
+                    unpack_codecs(ptr);
+                    ptr++;
                     uint8_t const* freq_ptr =
-                        decode(ptr, buf.data(),
+                        decode(cur_doc_codec, ptr, buf.data(),
                                            gaps_universe, cur_block_size);
                     blocks.back().freqs_begin = freq_ptr;
-                    ptr = decode(freq_ptr, buf.data(),
+                    ptr = decode(cur_freq_codec, buf.data(),
                                              uint32_t(-1), cur_block_size);
                     blocks.back().end = ptr;
                 }
@@ -350,14 +361,21 @@ namespace pisa {
             }
 
         private:
+
+            void unpack_codecs(uint8_t const* block_data)
+            {
+                uint8_t codec = *block_data++;
+                cur_doc_codec = codec & 0b00001111;
+                cur_freq_codec = (codec & 0b11110000) >> 4;
+            }
+
             uint32_t block_max(uint32_t block) const
             {
                 return ((uint32_t const*)m_block_maxs)[block];
             }
 
-            uint8_t const* decode(uint8_t const* in, uint32_t* out, uint32_t sum_of_values, size_t n) const
+            uint8_t const* decode(uint8_t codec, uint8_t const* in, uint32_t* out, uint32_t sum_of_values, size_t n) const
             {
-                uint8_t codec = *in++;
                 switch(codec) {
                     case block_varintg8iu:
                         in = varint_G8IU_block::decode(in, out, sum_of_values, n);
@@ -407,8 +425,10 @@ namespace pisa {
                     ? block_size : (size() % block_size);
                 uint32_t cur_base = (block ? block_max(block - 1) : uint32_t(-1)) + 1;
                 m_cur_block_max = block_max(block);
+                unpack_codecs(block_data);
+                block_data++;
                 m_freqs_block_data =
-                    decode(block_data, m_docs_buf.data(),
+                    decode(cur_doc_codec, block_data, m_docs_buf.data(),
                                        m_cur_block_max - cur_base - (m_cur_block_size - 1),
                                        m_cur_block_size);
                 intrinsics::prefetch(m_freqs_block_data);
@@ -426,8 +446,8 @@ namespace pisa {
 
             void PISA_NOINLINE decode_freqs_block()
             {
-                uint8_t const* next_block = decode(m_freqs_block_data, m_freqs_buf.data(),
-                                                               uint32_t(-1), m_cur_block_size);
+                uint8_t const* next_block = decode(cur_freq_codec, m_freqs_block_data, m_freqs_buf.data(),
+                                                   uint32_t(-1), m_cur_block_size);
                 intrinsics::prefetch(next_block);
                 m_freqs_decoded = true;
 
@@ -449,6 +469,8 @@ namespace pisa {
             uint32_t m_cur_block_max;
             uint32_t m_cur_block_size;
             uint32_t m_cur_docid;
+            uint8_t cur_doc_codec;
+            uint8_t cur_freq_codec;
 
             uint8_t const* m_freqs_block_data;
             bool m_freqs_decoded;
@@ -457,6 +479,7 @@ namespace pisa {
             std::vector<uint32_t> m_freqs_buf;
 
             block_profiler::counter_type* m_block_profile;
+
        };
 
     };
