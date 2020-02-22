@@ -15,10 +15,6 @@ struct qmx_block {
 
         assert(n <= block_size);
         uint32_t *src = const_cast<uint32_t *>(in);
-        if (n < block_size) {
-            interpolative_block::encode(src, sum_of_values, n, out);
-            return;
-        }
         thread_local QMX::compress_integer_qmx_improved qmx_codec;
         thread_local std::vector<uint8_t> buf(2 * n * sizeof(uint32_t) + overflow);
 
@@ -32,9 +28,6 @@ struct qmx_block {
                                  size_t n) {
         static QMX::compress_integer_qmx_improved qmx_codec; // decodeBlock is thread-safe
         assert(n <= block_size);
-        if (PISA_UNLIKELY(n < block_size)) {
-            return interpolative_block::decode(in, out, sum_of_values, n);
-        }
         uint32_t enc_len = 0;
         in = TightVariableByte::decode(in, &enc_len, 1);
         std::vector<uint32_t> buf(2 * n + overflow);

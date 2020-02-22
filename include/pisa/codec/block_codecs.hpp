@@ -213,12 +213,6 @@ namespace pisa {
             thread_local codec_type optpfor_codec;
             thread_local std::vector<uint8_t> buf(2 * 4 * block_size);
             assert(n <= block_size);
-
-            if (n < block_size) {
-                interpolative_block::encode(in, sum_of_values, n, out);
-                return;
-            }
-
             size_t out_len = buf.size();
 
             optpfor_codec.force_b = b;
@@ -233,11 +227,6 @@ namespace pisa {
         {
             thread_local codec_type optpfor_codec; // pfor decoding is *not* thread-safe
             assert(n <= block_size);
-
-            if (PISA_UNLIKELY(n < block_size)) {
-                return interpolative_block::decode(in, out, sum_of_values, n);
-            }
-
             size_t out_len = block_size;
             uint8_t const* ret;
 
@@ -283,12 +272,6 @@ namespace pisa {
             thread_local codec_type varint_codec;
             thread_local std::vector<uint8_t> buf(2 * 4 * block_size);
             assert(n <= block_size);
-
-            if (n < block_size) {
-                interpolative_block::encode(in, sum_of_values, n, out);
-                return;
-            }
-
             size_t out_len = buf.size();
 
             const uint32_t * src = in;
@@ -309,11 +292,6 @@ namespace pisa {
         {
             static codec_type varint_codec; // decodeBlock is thread-safe
             assert(n <= block_size);
-
-            if (PISA_UNLIKELY(n < block_size)) {
-                return interpolative_block::decode(in, out, sum_of_values, n);
-            }
-
             size_t out_len = 0;
             uint8_t const* src = in;
             uint32_t* dst = out;
