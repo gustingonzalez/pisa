@@ -11,7 +11,6 @@ namespace pisa {
         block_varintg8iu,
         block_streamvbyte,
         block_maskedvbyte,
-        block_varintgb,
         block_interpolative,
         block_qmx,
         block_simple8b,
@@ -120,12 +119,11 @@ namespace pisa {
         static uint8_t encode(uint32_t const* in, uint32_t sum_of_values,
                            size_t n, std::vector<uint8_t>& out)
         {
-            std::vector<std::vector<uint8_t> > encodes(10);
+            std::vector<std::vector<uint8_t> > encodes(9);
 
             varint_G8IU_block::encode(in, sum_of_values, n, encodes[block_varintg8iu]);
             streamvbyte_block::encode(in, sum_of_values, n, encodes[block_streamvbyte]);
             maskedvbyte_block::encode(in, sum_of_values, n, encodes[block_maskedvbyte]);
-            varintgb_block::encode(in, sum_of_values, n, encodes[block_varintgb]);
             interpolative_block::encode(in, sum_of_values, n, encodes[block_interpolative]);
             qmx_block::encode(in, sum_of_values, n, encodes[block_qmx]);
             simple8b_block::encode(in, sum_of_values, n, encodes[block_simple8b]);
@@ -137,7 +135,6 @@ namespace pisa {
                 encodes[block_varintg8iu].size(),
                 encodes[block_streamvbyte].size(),
                 encodes[block_maskedvbyte].size(),
-                encodes[block_varintgb].size(),
                 encodes[block_interpolative].size(),
                 encodes[block_qmx].size(),
                 encodes[block_simple8b].size(),
@@ -385,9 +382,6 @@ namespace pisa {
                         break;
                     case block_maskedvbyte:
                         in = maskedvbyte_block::decode(in, out, sum_of_values, n);
-                        break;
-                    case block_varintgb:
-                        in = varintgb_block::decode(in, out, sum_of_values, n);
                         break;
                     case block_interpolative:
                         in = interpolative_block::decode(in, out, sum_of_values, n);
