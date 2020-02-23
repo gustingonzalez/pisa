@@ -120,30 +120,40 @@ namespace pisa {
                            size_t n, std::vector<uint8_t>& out)
         {
             std::vector<std::vector<uint8_t> > encodes(9);
+            std::vector<size_t> sizes(9, SIZE_MAX);
 
-            varint_G8IU_block::encode(in, sum_of_values, n, encodes[block_varintg8iu]);
-            streamvbyte_block::encode(in, sum_of_values, n, encodes[block_streamvbyte]);
-            maskedvbyte_block::encode(in, sum_of_values, n, encodes[block_maskedvbyte]);
+            if (n >= 8)
+            {
+                varint_G8IU_block::encode(in, sum_of_values, n, encodes[block_varintg8iu]);
+                sizes[block_varintg8iu] = encodes[block_varintg8iu].size(); 
+            }
+
+            if (n >= 16)
+            {
+                streamvbyte_block::encode(in, sum_of_values, n, encodes[block_streamvbyte]);
+                maskedvbyte_block::encode(in, sum_of_values, n, encodes[block_maskedvbyte]);
+                sizes[block_streamvbyte] = encodes[block_streamvbyte].size();
+                sizes[block_maskedvbyte] = encodes[block_maskedvbyte].size(); 
+            }
+
+            if (n == block_size)
+            {
+                simdbp_block::encode(in, sum_of_values, n, encodes[block_simdbp]);
+                optpfor_block::encode(in, sum_of_values, n, encodes[block_optpfor]);
+                sizes[block_simdbp] = encodes[block_simdbp].size();
+                sizes[block_optpfor] = encodes[block_optpfor].size(); 
+            }
+            
             interpolative_block::encode(in, sum_of_values, n, encodes[block_interpolative]);
-            qmx_block::encode(in, sum_of_values, n, encodes[block_qmx]);
             simple8b_block::encode(in, sum_of_values, n, encodes[block_simple8b]);
             simple16_block::encode(in, sum_of_values, n, encodes[block_simple16]);
-            simdbp_block::encode(in, sum_of_values, n, encodes[block_simdbp]);
-            optpfor_block::encode(in, sum_of_values, n, encodes[block_optpfor]);
-            // auto comparator = [](int x, int y) { return x < y ? x : y; };
-            std::vector<size_t> sizes {
-                encodes[block_varintg8iu].size(),
-                encodes[block_streamvbyte].size(),
-                encodes[block_maskedvbyte].size(),
-                encodes[block_interpolative].size(),
-                encodes[block_qmx].size(),
-                encodes[block_simple8b].size(),
-                encodes[block_simple16].size(),
-                encodes[block_simdbp].size(),
-                encodes[block_optpfor].size()
-            };
+            qmx_block::encode(in, sum_of_values, n, encodes[block_qmx]);
 
-            // Gets codec (index). TODO: test this!
+            sizes[block_interpolative] = encodes[block_interpolative].size();
+            sizes[block_simple8b] = encodes[block_simple8b].size(); 
+            sizes[block_simple16] = encodes[block_simple16].size();
+            sizes[block_qmx] = encodes[block_qmx].size();
+            
             uint8_t codec = std::min_element(sizes.begin(), sizes.end()) - sizes.begin();
             size_t out_len = encodes[codec].size();
             out.insert(out.end(), encodes[codec].data(), encodes[codec].data() + out_len);
