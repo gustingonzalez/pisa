@@ -11,6 +11,7 @@ namespace pisa {
         block_varintg8iu,
         block_streamvbyte,
         block_maskedvbyte,
+        block_varintgb,
         block_interpolative,
         block_qmx,
         block_simple8b,
@@ -122,10 +123,10 @@ namespace pisa {
                               std::vector<uint8_t> &out)
         {
             // Encodeds of 'in'.
-            std::vector<std::vector<uint8_t>> encoded(9);
+            std::vector<std::vector<uint8_t>> encoded(10);
 
             // Starts encodes sizes in the max possible value.
-            std::vector<size_t> sizes(9, SIZE_MAX);
+            std::vector<size_t> sizes(10, SIZE_MAX);
 
             // Encodes according the minimum integers required for varint.
             if (n >= 8) {
@@ -142,17 +143,19 @@ namespace pisa {
             }
 
             // Encoders that don't need a special number of integers.
+            interpolative_block::encode(in, sum_of_values, n, encoded[block_interpolative]);
             streamvbyte_block::encode(in, sum_of_values, n, encoded[block_streamvbyte]);
             maskedvbyte_block::encode(in, sum_of_values, n, encoded[block_maskedvbyte]);
-            interpolative_block::encode(in, sum_of_values, n, encoded[block_interpolative]);
             simple8b_block::encode(in, sum_of_values, n, encoded[block_simple8b]);
             simple16_block::encode(in, sum_of_values, n, encoded[block_simple16]);
+            varintgb_block::encode(in, sum_of_values, n, encoded[block_varintgb]);
             qmx_block::encode(in, sum_of_values, n, encoded[block_qmx]);
+            sizes[block_interpolative] = encoded[block_interpolative].size();
             sizes[block_streamvbyte] = encoded[block_streamvbyte].size();
             sizes[block_maskedvbyte] = encoded[block_maskedvbyte].size();
-            sizes[block_interpolative] = encoded[block_interpolative].size();
             sizes[block_simple8b] = encoded[block_simple8b].size();
             sizes[block_simple16] = encoded[block_simple16].size();
+            sizes[block_varintgb] = encoded[block_varintgb].size();
             sizes[block_qmx] = encoded[block_qmx].size();
 
             // Selects the encoder that generates the minimum number of bytes.
@@ -394,6 +397,9 @@ namespace pisa {
                         break;
                     case block_maskedvbyte:
                         in = maskedvbyte_block::decode(in, out, sum_of_values, n);
+                        break;
+                    case block_varintgb:
+                        in = varintgb_block::decode(in, out, sum_of_values, n);
                         break;
                     case block_interpolative:
                         in = interpolative_block::decode(in, out, sum_of_values, n);
