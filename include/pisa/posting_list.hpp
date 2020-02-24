@@ -116,47 +116,49 @@ namespace pisa {
             }
         }
 
-        static uint8_t encode(uint32_t const* in, uint32_t sum_of_values,
-                           size_t n, std::vector<uint8_t>& out)
+        static uint8_t encode(uint32_t const *in,
+                              uint32_t sum_of_values,
+                              size_t n,
+                              std::vector<uint8_t> &out)
         {
-            std::vector<std::vector<uint8_t> > encodes(9);
+            // Encodeds of 'in'.
+            std::vector<std::vector<uint8_t>> encoded(9);
+
+            // Starts encodes sizes in the max possible value.
             std::vector<size_t> sizes(9, SIZE_MAX);
 
-            if (n >= 8)
-            {
-                varint_G8IU_block::encode(in, sum_of_values, n, encodes[block_varintg8iu]);
-                sizes[block_varintg8iu] = encodes[block_varintg8iu].size(); 
+            // Encodes according the minimum integers required for varint.
+            if (n >= 8) {
+                varint_G8IU_block::encode(in, sum_of_values, n, encoded[block_varintg8iu]);
+                sizes[block_varintg8iu] = encoded[block_varintg8iu].size();
             }
 
-            if (n >= 16)
-            {
-                streamvbyte_block::encode(in, sum_of_values, n, encodes[block_streamvbyte]);
-                maskedvbyte_block::encode(in, sum_of_values, n, encodes[block_maskedvbyte]);
-                sizes[block_streamvbyte] = encodes[block_streamvbyte].size();
-                sizes[block_maskedvbyte] = encodes[block_maskedvbyte].size(); 
+            // Encodes considering that BP and PFD only handle chunks of block size.
+            if (n == block_size) {
+                simdbp_block::encode(in, sum_of_values, n, encoded[block_simdbp]);
+                optpfor_block::encode(in, sum_of_values, n, encoded[block_optpfor]);
+                sizes[block_simdbp] = encoded[block_simdbp].size();
+                sizes[block_optpfor] = encoded[block_optpfor].size();
             }
 
-            if (n == block_size)
-            {
-                simdbp_block::encode(in, sum_of_values, n, encodes[block_simdbp]);
-                optpfor_block::encode(in, sum_of_values, n, encodes[block_optpfor]);
-                sizes[block_simdbp] = encodes[block_simdbp].size();
-                sizes[block_optpfor] = encodes[block_optpfor].size(); 
-            }
-            
-            interpolative_block::encode(in, sum_of_values, n, encodes[block_interpolative]);
-            simple8b_block::encode(in, sum_of_values, n, encodes[block_simple8b]);
-            simple16_block::encode(in, sum_of_values, n, encodes[block_simple16]);
-            qmx_block::encode(in, sum_of_values, n, encodes[block_qmx]);
+            // Encoders that don't need a special number of integers.
+            streamvbyte_block::encode(in, sum_of_values, n, encoded[block_streamvbyte]);
+            maskedvbyte_block::encode(in, sum_of_values, n, encoded[block_maskedvbyte]);
+            interpolative_block::encode(in, sum_of_values, n, encoded[block_interpolative]);
+            simple8b_block::encode(in, sum_of_values, n, encoded[block_simple8b]);
+            simple16_block::encode(in, sum_of_values, n, encoded[block_simple16]);
+            qmx_block::encode(in, sum_of_values, n, encoded[block_qmx]);
+            sizes[block_streamvbyte] = encoded[block_streamvbyte].size();
+            sizes[block_maskedvbyte] = encoded[block_maskedvbyte].size();
+            sizes[block_interpolative] = encoded[block_interpolative].size();
+            sizes[block_simple8b] = encoded[block_simple8b].size();
+            sizes[block_simple16] = encoded[block_simple16].size();
+            sizes[block_qmx] = encoded[block_qmx].size();
 
-            sizes[block_interpolative] = encodes[block_interpolative].size();
-            sizes[block_simple8b] = encodes[block_simple8b].size(); 
-            sizes[block_simple16] = encodes[block_simple16].size();
-            sizes[block_qmx] = encodes[block_qmx].size();
-            
+            // Selects the encoder that generates the minimum number of bytes.
             uint8_t codec = std::min_element(sizes.begin(), sizes.end()) - sizes.begin();
-            size_t out_len = encodes[codec].size();
-            out.insert(out.end(), encodes[codec].data(), encodes[codec].data() + out_len);
+            size_t out_len = encoded[codec].size();
+            out.insert(out.end(), encoded[codec].data(), encoded[codec].data() + out_len);
             return codec;
         }
 
@@ -485,6 +487,5 @@ namespace pisa {
             block_profiler::counter_type* m_block_profile;
 
        };
-
     };
 }
