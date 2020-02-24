@@ -244,7 +244,7 @@ struct varintgb_block {
                        std::vector<uint8_t> &out) {
         thread_local VarIntGB<false> varintgb_codec;
         assert(n <= block_size);
-        thread_local std::vector<uint8_t> buf(2 * n * sizeof(uint32_t));
+        thread_local std::vector<uint8_t> buf(2 * block_size * sizeof(uint32_t));
         size_t                            out_len = varintgb_codec.encodeArray(in, n, buf.data());
         out.insert(out.end(), buf.data(), buf.data() + out_len);
     }

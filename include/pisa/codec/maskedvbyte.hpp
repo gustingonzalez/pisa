@@ -17,7 +17,7 @@ struct maskedvbyte_block {
 
         assert(n <= block_size);
         uint32_t *src = const_cast<uint32_t *>(in);
-        thread_local std::vector<uint8_t> buf(2 * n * sizeof(uint32_t));
+        thread_local std::vector<uint8_t> buf(2 * block_size * sizeof(uint32_t));
         size_t out_len = vbyte_encode(src, n, buf.data());
         out.insert(out.end(), buf.data(), buf.data() + out_len);
     }
