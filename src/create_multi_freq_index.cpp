@@ -2,8 +2,8 @@
 #include <fstream>
 #include <iostream>
 #include <numeric>
-#include <thread>
 #include <optional>
+#include <thread>
 
 #include "boost/algorithm/string/predicate.hpp"
 #include "spdlog/spdlog.h"
@@ -11,9 +11,9 @@
 #include "mappable/mapper.hpp"
 
 #include "configuration.hpp"
-#include "util/index_build_utils.hpp"
 #include "index_types.hpp"
 #include "multi_freq_index.hpp"
+#include "util/index_build_utils.hpp"
 #include "util/util.hpp"
 #include "util/verify_collection.hpp" // XXX move to index_build_utils
 
@@ -21,9 +21,14 @@
 
 using namespace pisa;
 
-void write_codec_stats(ofstream &output, std::vector<CodecTypes> &codecs) {
-    std::copy(codecs.rbegin(), codecs.rend(),
-          std::ostream_iterator<int>(output, " "));
+void write_codec_stats(ofstream &output,
+                       size_t plist_size,
+                       std::vector<std::pair<uint8_t, size_t>> &codecs)
+{
+    output << "size: " << plist_size << "\n";
+    for (auto codec : codecs) {
+        output << std::to_string(codec.first) << ": " << codec.second << "\n";
+    }
     output << "\n";
 }
 
@@ -32,7 +37,8 @@ void create_collection(InputCollection const &input,
                        pisa::global_parameters const &params,
                        const std::optional<std::string> &output_filename,
                        bool stats = false,
-                       bool check = true) {
+                       bool check = true)
+{
     using namespace pisa;
     std::string const seq_type = "Multicompression";
     spdlog::info("Processing {} documents", input.num_docs());
@@ -49,15 +55,16 @@ void create_collection(InputCollection const &input,
         for (auto const &plist : input) {
             uint64_t freqs_sum;
             size = plist.docs.size();
-            freqs_sum = std::accumulate(plist.freqs.begin(), plist.freqs.begin() + size, uint64_t(0));
+            freqs_sum =
+                std::accumulate(plist.freqs.begin(), plist.freqs.begin() + size, uint64_t(0));
             auto [doc_codecs, freq_codecs] =
                 builder.add_posting_list(size, plist.docs.begin(), plist.freqs.begin(), freqs_sum);
 
             if (stats) {
-                write_codec_stats(doc_codecs_output, doc_codecs);
-                write_codec_stats(freq_codecs_output, freq_codecs); 
+                write_codec_stats(doc_codecs_output, size, doc_codecs);
+                write_codec_stats(freq_codecs_output, size, freq_codecs);
             }
-            
+
             progress.update(1);
             postings += size;
         }
@@ -81,12 +88,13 @@ void create_collection(InputCollection const &input,
         mapper::freeze(coll, (*output_filename).c_str());
         if (check) {
             verify_collection<binary_freq_collection, CollectionType>(input,
-                                                               (*output_filename).c_str());
+                                                                      (*output_filename).c_str());
         }
     }
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char **argv)
+{
     using namespace pisa;
     std::string type;
     std::string input_basename;
@@ -104,7 +112,8 @@ int main(int argc, char **argv) {
     params.log_partition_size = configuration::get().log_partition_size;
 
     using coll_type = multi_freq_index<false>;
-    create_collection<binary_freq_collection, coll_type>(input, params, output_filename, true, check);
+    create_collection<binary_freq_collection, coll_type>(
+        input, params, output_filename, true, check);
 
     return 0;
 }
