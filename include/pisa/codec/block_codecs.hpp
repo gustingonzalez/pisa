@@ -137,7 +137,7 @@ namespace pisa {
     };
 
     struct interpolative_block {
-        static const uint64_t block_size = 128;
+        static const uint64_t block_size = 256;
 
         static void encode(uint32_t const* in, uint32_t sum_of_values,
                            size_t n, std::vector<uint8_t>& out)
@@ -187,7 +187,7 @@ namespace pisa {
 
     struct optpfor_block {
 
-        struct codec_type : FastPForLib::OPTPFor<4, FastPForLib::Simple16<false>> {
+        struct codec_type : FastPForLib::OPTPFor<8, FastPForLib::Simple16<false>> {
 
             uint8_t const* force_b;
 
@@ -254,7 +254,7 @@ namespace pisa {
     };
 
     struct varint_G8IU_block {
-        static const uint64_t block_size = 128;
+        static const uint64_t block_size = 256;
 
         struct codec_type : VarIntG8IU {
 

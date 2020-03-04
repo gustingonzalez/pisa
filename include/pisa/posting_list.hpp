@@ -68,7 +68,7 @@ static decoder decoders[] {
 
 template <bool Profile = false>
 struct posting_list {
-    static const uint64_t block_size = 128;
+    static const uint64_t block_size = 256;
     template <typename DocsIterator, typename FreqsIterator>
     // Returns <used doc codecs, used freq codecs>
     auto static write(std::vector<uint8_t> &out,

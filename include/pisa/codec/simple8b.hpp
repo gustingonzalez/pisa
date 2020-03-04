@@ -4,7 +4,7 @@
 namespace pisa {
 
 struct simple8b_block {
-    static const uint64_t block_size = 128;
+    static const uint64_t block_size = 256;
 
 
     static void encode(uint32_t const *in,
