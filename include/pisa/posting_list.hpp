@@ -64,16 +64,21 @@ struct posting_list {
             }
             *((uint32_t *)&out[begin_block_maxs + 4 * b]) = last_doc;
 
-            // Reserves space for codecs.
-            size_t codecs_index = out.size();
-            out.push_back(0);
+            // Reserves space for codecs if n > 1.
+            size_t codecs_index = 0;
+            if (cur_block_size > 1) {
+                codecs_index = out.size();
+                out.push_back(0);
+            }
 
             auto doc_codec = encode(
                 docs_buf.data(), last_doc - block_base - (cur_block_size - 1), cur_block_size, out);
             auto freq_codec = encode(freqs_buf.data(), uint32_t(-1), cur_block_size, out);
 
             // Saves codecs.
-            out[codecs_index] += doc_codec.first + (freq_codec.first << 4);
+            if (cur_block_size > 1) {
+                out[codecs_index] += doc_codec.first + (freq_codec.first << 4);
+            }
 
             doc_codecs.push_back(doc_codec);
             freq_codecs.push_back(freq_codec);
@@ -123,6 +128,12 @@ struct posting_list {
                        size_t n,
                        std::vector<uint8_t> &out) -> std::pair<uint8_t, size_t>
     {
+        if (n == 1)
+        {
+            interpolative_block::encode(in, sum_of_values, n, out);
+            return {block_interpolative, 0};
+        }
+
         // Encodeds of 'in'.
         std::vector<std::vector<uint8_t>> encoded(10);
 
@@ -269,8 +280,7 @@ struct posting_list {
                     ((b + 1) * block_size <= size()) ? block_size : (size() % block_size);
 
                 uint32_t cur_base = (b ? block_max(b - 1) : uint32_t(-1)) + 1;
-                unpack_codecs(ptr);
-                ptr++;
+                unpack_codecs(cur_block_size, ptr);
                 uint8_t const *freq_ptr = decode(cur_doc_codec,
                                                  ptr,
                                                  buf.data(),
@@ -340,8 +350,7 @@ struct posting_list {
                 blocks.back().doc_gaps_universe = gaps_universe;
                 blocks.back().max = block_max(b);
 
-                unpack_codecs(ptr);
-                ptr++;
+                unpack_codecs(cur_block_size, ptr);
                 uint8_t const *freq_ptr =
                     decode(cur_doc_codec, ptr, buf.data(), gaps_universe, cur_block_size);
                 blocks.back().freqs_begin = freq_ptr;
@@ -354,11 +363,16 @@ struct posting_list {
         }
 
        private:
-        void unpack_codecs(uint8_t const *block_data)
+        void unpack_codecs(size_t n, uint8_t const *&block_data)
         {
-            uint8_t codec = *block_data++;
-            cur_doc_codec = codec & 0b00001111;
-            cur_freq_codec = (codec & 0b11110000) >> 4;
+            if PISA_LIKELY(n > 1) {
+                uint8_t codec = *block_data++;
+                cur_doc_codec = codec & 0b00001111;
+                cur_freq_codec = (codec & 0b11110000) >> 4;
+            } else {
+                cur_doc_codec = block_interpolative;
+                cur_freq_codec = block_interpolative;
+            }
         }
 
         uint32_t block_max(uint32_t block) const { return ((uint32_t const *)m_block_maxs)[block]; }
@@ -412,8 +426,7 @@ struct posting_list {
                 ((block + 1) * block_size <= size()) ? block_size : (size() % block_size);
             uint32_t cur_base = (block ? block_max(block - 1) : uint32_t(-1)) + 1;
             m_cur_block_max = block_max(block);
-            unpack_codecs(block_data);
-            block_data++;
+            unpack_codecs(m_cur_block_size, block_data);
             m_freqs_block_data = decode(cur_doc_codec,
                                         block_data,
                                         m_docs_buf.data(),
