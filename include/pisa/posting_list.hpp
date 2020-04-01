@@ -5,7 +5,11 @@
 #include "util/util.hpp"
 
 namespace pisa {
-
+/**
+ * Codec types where each codec number (starting from zero) matches
+ * with a 'decode function' inside a selector (array) of function
+ * pointers. This implementation avoids branches when decoding.
+ */
 enum CodecTypes {
     block_simdbp,
     block_varintg8iu,
@@ -16,7 +20,22 @@ enum CodecTypes {
     block_streamvbyte,
     block_qmx,
     block_optpfor,
-    block_interpolative
+    block_interpolative,
+
+    // Codecs below are used as fallback in order to read posting lists
+    // having only a single element. Note that no overhead is required
+    // when a fallback codec is used.
+
+    // In the original PISA behavior, when the docs block is 1, 'BIC' is
+    // used as 'dummy codec'. Internally nothing is saved, returning the
+    // 'sum of values' (overhead) parameter when decoding. In order to allow
+    // a faster access time, this behavior was moved to a specific function.
+    single_dummy,
+
+    // In addition to the docs block behavior, when the freqs block is also 1,
+    // 'TightVariableByte' is used as a BIC's 'fallback codec'. This behavior
+    // was moved to a specific function too.
+    single_vbyte,
 };
 
 typedef uint8_t const *(*decoder)(uint8_t const *, uint32_t *, uint32_t, size_t);
@@ -31,6 +50,15 @@ static decoder decoders[] {
     qmx_block::decode,
     optpfor_block::decode,
     interpolative_block::decode,
+    // Note that 'dummy parameters' are used (i.e. 'size_t') to allow generic
+    // calls when decoding, such as: decoders[10].decode(in, out, s, n)
+    [](uint8_t const *in, uint32_t *out, uint32_t sum_of_values, size_t) {
+        out[0] = sum_of_values;
+        return in;
+    },
+    [](uint8_t const *in, uint32_t *out, uint32_t, size_t) {
+        return TightVariableByte::decode(in, out, 1);
+    },
 };
 
 template <bool Profile = false>
@@ -142,10 +170,19 @@ struct posting_list {
                        size_t n,
                        std::vector<uint8_t> &out) -> std::pair<uint8_t, size_t>
     {
-        if (n == 1)
-        {
-            interpolative_block::encode(in, sum_of_values, n, out);
-            return {block_interpolative, 0};
+        bool docs_encoding = sum_of_values != uint32_t(-1);
+        
+        // If 'n' is equal to 1...
+        if (n == 1) {
+            // If this one integer is a doc...
+            if (docs_encoding) {
+                return {single_dummy, 0};
+            } else {
+                std::vector<uint8_t> buf;
+                maskedvbyte_block::encode(in, sum_of_values, n, buf);
+                out.insert(out.end(), buf.data(), buf.data() + buf.size());
+                return {single_vbyte, buf.size()};
+            }
         }
 
         // Encodeds of 'in'.
@@ -384,8 +421,8 @@ struct posting_list {
                 cur_doc_codec = codec & 0b00001111;
                 cur_freq_codec = (codec & 0b11110000) >> 4;
             } else {
-                cur_doc_codec = block_interpolative;
-                cur_freq_codec = block_interpolative;
+                cur_doc_codec = single_dummy;
+                cur_freq_codec = single_vbyte;
             }
         }
 
