@@ -7,30 +7,30 @@
 namespace pisa {
 
 enum CodecTypes {
+    block_simdbp,
     block_varintg8iu,
-    block_streamvbyte,
-    block_maskedvbyte,
     block_varintgb,
-    block_interpolative,
-    block_qmx,
+    block_maskedvbyte,
     block_simple8b,
     block_simple16,
-    block_simdbp,
-    block_optpfor
+    block_streamvbyte,
+    block_qmx,
+    block_optpfor,
+    block_interpolative
 };
 
 typedef uint8_t const *(*decoder)(uint8_t const *, uint32_t *, uint32_t, size_t);
 static decoder decoders[] {
+    simdbp_block::decode,
     varint_G8IU_block::decode,
-    streamvbyte_block::decode,
-    maskedvbyte_block::decode,
     varintgb_block::decode,
-    interpolative_block::decode,
-    qmx_block::decode,
+    maskedvbyte_block::decode,
     simple8b_block::decode,
     simple16_block::decode,
-    simdbp_block::decode,
+    streamvbyte_block::decode,
+    qmx_block::decode,
     optpfor_block::decode,
+    interpolative_block::decode,
 };
 
 template <bool Profile = false>
