@@ -57,7 +57,7 @@ static decoder decoders[] {
         return in;
     },
     [](uint8_t const *in, uint32_t *out, uint32_t, size_t) {
-        return TightVariableByte::decode(in, out, 1);
+        return TightVariableByte::next(in, out[0]);
     },
 };
 
@@ -179,7 +179,8 @@ struct posting_list {
                 return {single_dummy, 0};
             } else {
                 std::vector<uint8_t> buf;
-                maskedvbyte_block::encode(in, sum_of_values, n, buf);
+                TightVariableByte::encode_single(in[0], buf);
+                // maskedvbyte_block::encode(in, sum_of_values, n, buf);
                 out.insert(out.end(), buf.data(), buf.data() + buf.size());
                 return {single_vbyte, buf.size()};
             }

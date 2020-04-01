@@ -58,3 +58,21 @@ TEST_CASE("block_codecs")
     test_block_codec<pisa::varint_G8IU_block>(
         {8, 16, pisa::varint_G8IU_block::block_size - 1, pisa::varint_G8IU_block::block_size});
 }
+
+TEST_CASE("tight_variable_byte - single/next encode/decode")
+{
+    for (int i = 0; i < 8; i++) {
+        uint32_t values[2] = {(uint32_t)rand(), (uint32_t)rand()};
+        vector<uint8_t> encoded;
+
+        pisa::TightVariableByte::encode_single(values[0], encoded);
+        pisa::TightVariableByte::encode_single(values[1], encoded);
+
+        uint8_t const *encpointer = encoded.data();
+        uint32_t val;
+        encpointer = pisa::TightVariableByte::next(encpointer, val);
+        REQUIRE(val == values[0]);
+        pisa::TightVariableByte::next(encpointer, val);
+        REQUIRE(val == values[1]);
+    }
+}

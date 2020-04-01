@@ -118,6 +118,21 @@ namespace pisa {
             }
         }
 
+        /**
+         * Decodes next integer. This method is optimal when an unique integer
+         * must be decoded (note: SIMD isn't used here).
+        */
+        static uint8_t const *next(uint8_t const *in, uint32_t &val) {
+            // Gets the first byte avoiding the continuation bit.
+            uint32_t c = *in++;
+            val = c & 0x7F;
+            // Iterates while the continuation bit be true.
+            for (uint32_t shift = 7; !(c & 0x80); shift += 7) {
+                // Adds, to the output integer, the byte with the adequate shifting.
+                val |= (((c = *in++) & 0x7F) << shift);
+            }
+            return in;
+        }
     };
 
     struct interpolative_block {
