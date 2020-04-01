@@ -19,6 +19,20 @@ enum CodecTypes {
     block_optpfor
 };
 
+typedef uint8_t const *(*decoder)(uint8_t const *, uint32_t *, uint32_t, size_t);
+static decoder decoders[] {
+    varint_G8IU_block::decode,
+    streamvbyte_block::decode,
+    maskedvbyte_block::decode,
+    varintgb_block::decode,
+    interpolative_block::decode,
+    qmx_block::decode,
+    simple8b_block::decode,
+    simple16_block::decode,
+    simdbp_block::decode,
+    optpfor_block::decode,
+};
+
 template <bool Profile = false>
 struct posting_list {
     static const uint64_t block_size = 128;
@@ -281,12 +295,12 @@ struct posting_list {
 
                 uint32_t cur_base = (b ? block_max(b - 1) : uint32_t(-1)) + 1;
                 unpack_codecs(cur_block_size, ptr);
-                uint8_t const *freq_ptr = decode(cur_doc_codec,
-                                                 ptr,
-                                                 buf.data(),
-                                                 block_max(b) - cur_base - (cur_block_size - 1),
-                                                 cur_block_size);
-                ptr = decode(cur_freq_codec, freq_ptr, buf.data(), uint32_t(-1), cur_block_size);
+                uint8_t const *freq_ptr =
+                    decoders[cur_doc_codec](ptr,
+                                            buf.data(),
+                                            block_max(b) - cur_base - (cur_block_size - 1),
+                                            cur_block_size);
+                ptr = decoders[cur_freq_codec](freq_ptr, buf.data(), uint32_t(-1), cur_block_size);
                 bytes += ptr - freq_ptr;
             }
 
@@ -312,13 +326,13 @@ struct posting_list {
             void decode_doc_gaps(std::vector<uint32_t> &out) const
             {
                 out.resize(size);
-                decode(docs_begin, out.data(), doc_gaps_universe, size);
+                decoders[cur_doc_codec](docs_begin, out.data(), doc_gaps_universe, size);
             }
 
             void decode_freqs(std::vector<uint32_t> &out) const
             {
                 out.resize(size);
-                decode(freqs_begin, out.data(), uint32_t(-1), size);
+                decoders[cur_freq_codec](freqs_begin, out.data(), uint32_t(-1), size);
             }
 
            private:
@@ -352,9 +366,9 @@ struct posting_list {
 
                 unpack_codecs(cur_block_size, ptr);
                 uint8_t const *freq_ptr =
-                    decode(cur_doc_codec, ptr, buf.data(), gaps_universe, cur_block_size);
+                    decoders[cur_doc_codec](ptr, buf.data(), gaps_universe, cur_block_size);
                 blocks.back().freqs_begin = freq_ptr;
-                ptr = decode(cur_freq_codec, buf.data(), uint32_t(-1), cur_block_size);
+                ptr = decoders[cur_freq_codec](freq_ptr, buf.data(), uint32_t(-1), cur_block_size);
                 blocks.back().end = ptr;
             }
 
@@ -377,46 +391,6 @@ struct posting_list {
 
         uint32_t block_max(uint32_t block) const { return ((uint32_t const *)m_block_maxs)[block]; }
 
-        uint8_t const *decode(
-            uint8_t codec, uint8_t const *in, uint32_t *out, uint32_t sum_of_values, size_t n) const
-        {
-            switch (codec) {
-            case block_varintg8iu:
-                in = varint_G8IU_block::decode(in, out, sum_of_values, n);
-                break;
-            case block_streamvbyte:
-                in = streamvbyte_block::decode(in, out, sum_of_values, n);
-                break;
-            case block_maskedvbyte:
-                in = maskedvbyte_block::decode(in, out, sum_of_values, n);
-                break;
-            case block_varintgb:
-                in = varintgb_block::decode(in, out, sum_of_values, n);
-                break;
-            case block_interpolative:
-                in = interpolative_block::decode(in, out, sum_of_values, n);
-                break;
-            case block_qmx:
-                in = qmx_block::decode(in, out, sum_of_values, n);
-                break;
-            case block_simple8b:
-                in = simple8b_block::decode(in, out, sum_of_values, n);
-                break;
-            case block_simple16:
-                in = simple16_block::decode(in, out, sum_of_values, n);
-                break;
-            case block_simdbp:
-                in = simdbp_block::decode(in, out, sum_of_values, n);
-                break;
-            case block_optpfor:
-                in = optpfor_block::decode(in, out, sum_of_values, n);
-                break;
-            }
-
-            // std::cout << "Used codec: " << codec << std::endl;
-            return in;
-        }
-
         void PISA_NOINLINE decode_docs_block(uint64_t block)
         {
             // static const uint64_t block_size = block_size;
@@ -427,8 +401,8 @@ struct posting_list {
             uint32_t cur_base = (block ? block_max(block - 1) : uint32_t(-1)) + 1;
             m_cur_block_max = block_max(block);
             unpack_codecs(m_cur_block_size, block_data);
-            m_freqs_block_data = decode(cur_doc_codec,
-                                        block_data,
+            m_freqs_block_data =
+                decoders[cur_doc_codec](block_data,
                                         m_docs_buf.data(),
                                         m_cur_block_max - cur_base - (m_cur_block_size - 1),
                                         m_cur_block_size);
@@ -447,11 +421,8 @@ struct posting_list {
 
         void PISA_NOINLINE decode_freqs_block()
         {
-            uint8_t const *next_block = decode(cur_freq_codec,
-                                               m_freqs_block_data,
-                                               m_freqs_buf.data(),
-                                               uint32_t(-1),
-                                               m_cur_block_size);
+            uint8_t const *next_block = decoders[cur_freq_codec](
+                m_freqs_block_data, m_freqs_buf.data(), uint32_t(-1), m_cur_block_size);
             intrinsics::prefetch(next_block);
             m_freqs_decoded = true;
 
