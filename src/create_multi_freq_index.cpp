@@ -16,21 +16,11 @@
 #include "util/index_build_utils.hpp"
 #include "util/util.hpp"
 #include "util/verify_collection.hpp" // XXX move to index_build_utils
+#include "multicompression/stats.hpp"
 
 #include "CLI/CLI.hpp"
 
 using namespace pisa;
-
-void write_codec_stats(ofstream &output,
-                       size_t plist_size,
-                       std::vector<std::pair<uint8_t, size_t>> &codecs)
-{
-    output << "size: " << plist_size << "\n";
-    for (auto codec : codecs) {
-        output << std::to_string(codec.first) << ": " << codec.second << "\n";
-    }
-    output << "\n";
-}
 
 template <typename InputCollection, typename CollectionType>
 void create_collection(InputCollection const &input,
@@ -49,28 +39,31 @@ void create_collection(InputCollection const &input,
     size_t postings = 0;
     {
         pisa::progress progress("Create index", input.size());
-        ofstream doc_codecs_output{output_filename.value() + ".codecs.docs"};
-        ofstream freq_codecs_output{output_filename.value() + ".codecs.freqs"};
+        ofstream odstats{output_filename.value() + ".stats.docs"};
+        ofstream ofstats{output_filename.value() + ".stats.freqs"};
+        pisa::MulticompressionStatsManager::write_headers(odstats);
+        pisa::MulticompressionStatsManager::write_headers(ofstats);
 
+        auto plist_id = 0;
         for (auto const &plist : input) {
             uint64_t freqs_sum;
             size = plist.docs.size();
             freqs_sum =
                 std::accumulate(plist.freqs.begin(), plist.freqs.begin() + size, uint64_t(0));
-            auto [doc_codecs, freq_codecs] =
+            auto [dstats, fstats] =
                 builder.add_posting_list(size, plist.docs.begin(), plist.freqs.begin(), freqs_sum);
 
             if (stats) {
-                write_codec_stats(doc_codecs_output, size, doc_codecs);
-                write_codec_stats(freq_codecs_output, size, freq_codecs);
+                pisa::MulticompressionStatsManager::write_stats(plist_id, size, dstats, odstats);
+                pisa::MulticompressionStatsManager::write_stats(plist_id, size, fstats, ofstats);
+                plist_id++;
             }
 
             progress.update(1);
             postings += size;
         }
-
-        doc_codecs_output.close();
-        freq_codecs_output.close();
+        odstats.close();
+        ofstats.close();
     }
 
     CollectionType coll;

@@ -4,6 +4,7 @@
 #include "mappable/mappable_vector.hpp"
 
 #include "codec/compact_elias_fano.hpp"
+#include "multicompression/stats.hpp"
 #include "posting_list.hpp"
 
 namespace pisa {
@@ -26,8 +27,8 @@ class multi_freq_index {
                               DocsIterator docs_begin,
                               FreqsIterator freqs_begin,
                               uint64_t /* occurrences */)
-            -> std::pair<std::vector<std::pair<uint8_t, size_t>>,
-                         std::vector<std::pair<uint8_t, size_t>>>
+            -> std::pair<std::vector<pisa::ChunkStatistic>,
+                         std::vector<pisa::ChunkStatistic>>
         {
             if (!n)
                 throw std::invalid_argument("List must be nonempty");

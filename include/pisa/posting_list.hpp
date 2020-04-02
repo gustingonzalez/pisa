@@ -1,6 +1,7 @@
 #pragma once
 
 #include "codec/block_codecs.hpp"
+#include "multicompression/stats.hpp"
 #include "util/block_profiler.hpp"
 #include "util/util.hpp"
 
@@ -70,8 +71,7 @@ struct posting_list {
                       uint32_t n,
                       DocsIterator docs_begin,
                       FreqsIterator freqs_begin)
-        -> std::pair<std::vector<std::pair<uint8_t, size_t>>,
-                     std::vector<std::pair<uint8_t, size_t>>>
+        -> std::pair<std::vector<pisa::ChunkStatistic>, std::vector<pisa::ChunkStatistic>>
     {
         TightVariableByte::encode_single(n, out);
 
@@ -89,8 +89,8 @@ struct posting_list {
         uint32_t last_doc(-1);
         uint32_t block_base = 0;
 
-        std::vector<std::pair<uint8_t, size_t>> doc_codecs;
-        std::vector<std::pair<uint8_t, size_t>> freq_codecs;
+        std::vector<pisa::ChunkStatistic> dcstats;
+        std::vector<pisa::ChunkStatistic> fcstats;
 
         // Foreach block...
         for (size_t b = 0; b < blocks; ++b) {
@@ -117,21 +117,23 @@ struct posting_list {
                 docs_buf.data(), last_doc - block_base - (cur_block_size - 1), cur_block_size, out);
             auto freq_codec = encode(freqs_buf.data(), uint32_t(-1), cur_block_size, out);
 
+            pisa::ChunkStatistic dcs(docs_buf, cur_block_size, doc_codec.first, doc_codec.second, false);
+            pisa::ChunkStatistic fcs(freqs_buf, cur_block_size, freq_codec.first, freq_codec.second, true);
+
             // Saves codecs.
             if (cur_block_size > 1) {
                 out[codecs_index] += doc_codec.first + (freq_codec.first << 4);
             }
 
-            doc_codecs.push_back(doc_codec);
-            freq_codecs.push_back(freq_codec);
+            dcstats.push_back(dcs);
+            fcstats.push_back(fcs);
 
             if (b != blocks - 1) {
                 *((uint32_t *)&out[begin_block_endpoints + 4 * b]) = out.size() - begin_blocks;
             }
             block_base = last_doc + 1;
         }
-
-        return {doc_codecs, freq_codecs};
+        return {dcstats, fcstats};
     }
 
     template <typename BlockDataRange>
