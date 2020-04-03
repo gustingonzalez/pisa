@@ -167,7 +167,7 @@ namespace pisa {
             assert(n <= block_size);
             uint8_t const* inbuf = in;
             if (sum_of_values == uint32_t(-1)) {
-                inbuf = TightVariableByte::decode(inbuf, &sum_of_values, 1);
+                inbuf = TightVariableByte::next(inbuf, sum_of_values);
             }
 
             out[n - 1] = sum_of_values;
