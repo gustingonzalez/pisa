@@ -26,8 +26,8 @@ template <typename InputCollection, typename CollectionType>
 void create_collection(InputCollection const &input,
                        pisa::global_parameters const &params,
                        const std::optional<std::string> &output_filename,
-                       bool stats = false,
-                       bool check = true)
+                       bool stats,
+                       bool check)
 {
     using namespace pisa;
     std::string const seq_type = "Multicompression";
@@ -39,10 +39,15 @@ void create_collection(InputCollection const &input,
     size_t postings = 0;
     {
         pisa::progress progress("Create index", input.size());
-        ofstream odstats{output_filename.value() + ".stats.docs"};
-        ofstream ofstats{output_filename.value() + ".stats.freqs"};
-        pisa::MulticompressionStatsManager::write_headers(odstats);
-        pisa::MulticompressionStatsManager::write_headers(ofstats);
+
+        ofstream odstats;
+        ofstream ofstats;
+        if (stats) {
+            odstats.open(output_filename.value() + ".stats.docs");
+            pisa::MulticompressionStatsManager::write_headers(odstats);
+            ofstats.open(output_filename.value() + ".stats.freqs");
+            pisa::MulticompressionStatsManager::write_headers(ofstats);
+        }
 
         auto plist_id = 0;
         for (auto const &plist : input) {
@@ -62,8 +67,10 @@ void create_collection(InputCollection const &input,
             progress.update(1);
             postings += size;
         }
-        odstats.close();
-        ofstats.close();
+        if (stats) {
+            odstats.close();
+            ofstats.close();
+        }
     }
 
     CollectionType coll;
@@ -92,11 +99,13 @@ int main(int argc, char **argv)
     std::string type;
     std::string input_basename;
     std::optional<std::string> output_filename;
+    bool stats = false;
     bool check = false;
 
     CLI::App app{"create_multi_freq_index - a tool for creating a multicompressed index."};
     app.add_option("-c,--collection", input_basename, "Collection basename")->required();
     app.add_option("-o,--output", output_filename, "Output filename")->required();
+    app.add_flag("--stats", stats, "Generate stats per posting list chunk");
     app.add_flag("--check", check, "Check the correctness of the index");
     CLI11_PARSE(app, argc, argv);
 
@@ -106,7 +115,7 @@ int main(int argc, char **argv)
 
     using coll_type = multi_freq_index<false>;
     create_collection<binary_freq_collection, coll_type>(
-        input, params, output_filename, true, check);
+        input, params, output_filename, stats, check);
 
     return 0;
 }
