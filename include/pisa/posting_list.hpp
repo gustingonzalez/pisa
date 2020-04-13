@@ -115,7 +115,7 @@ struct posting_list {
 
             auto doc_codec = encode(
                 docs_buf.data(), last_doc - block_base - (cur_block_size - 1), cur_block_size, out);
-            auto freq_codec = encode(freqs_buf.data(), uint32_t(-1), cur_block_size, out);
+            auto freq_codec = encode(freqs_buf.data(), std::numeric_limits<uint32_t>::max(), cur_block_size, out);
 
             pisa::ChunkStatistic dcs(docs_buf, cur_block_size, doc_codec.first, doc_codec.second, false);
             pisa::ChunkStatistic fcs(freqs_buf, cur_block_size, freq_codec.first, freq_codec.second, true);
@@ -172,7 +172,7 @@ struct posting_list {
                        size_t n,
                        std::vector<uint8_t> &out) -> std::pair<uint8_t, size_t>
     {
-        bool docs_encoding = sum_of_values != uint32_t(-1);
+        bool docs_encoding = sum_of_values != std::numeric_limits<uint32_t>::max();
         
         // If 'n' is equal to 1...
         if (n == 1) {
@@ -333,14 +333,14 @@ struct posting_list {
                 uint32_t cur_block_size =
                     ((b + 1) * block_size <= size()) ? block_size : (size() % block_size);
 
-                uint32_t cur_base = (b ? block_max(b - 1) : uint32_t(-1)) + 1;
+                uint32_t cur_base = (b ? block_max(b - 1) : std::numeric_limits<uint32_t>::max()) + 1;
                 unpack_codecs(cur_block_size, ptr);
                 uint8_t const *freq_ptr =
                     decoders[cur_doc_codec](ptr,
                                             buf.data(),
                                             block_max(b) - cur_base - (cur_block_size - 1),
                                             cur_block_size);
-                ptr = decoders[cur_freq_codec](freq_ptr, buf.data(), uint32_t(-1), cur_block_size);
+                ptr = decoders[cur_freq_codec](freq_ptr, buf.data(), std::numeric_limits<uint32_t>::max(), cur_block_size);
                 bytes += ptr - freq_ptr;
             }
 
@@ -372,7 +372,7 @@ struct posting_list {
             void decode_freqs(std::vector<uint32_t> &out) const
             {
                 out.resize(size);
-                decoders[cur_freq_codec](freqs_begin, out.data(), uint32_t(-1), size);
+                decoders[cur_freq_codec](freqs_begin, out.data(), std::numeric_limits<uint32_t>::max(), size);
             }
 
            private:
@@ -405,7 +405,7 @@ struct posting_list {
             uint8_t const *block_data = m_blocks_data + endpoint;
             m_cur_block_size =
                 ((block + 1) * block_size <= size()) ? block_size : (size() % block_size);
-            uint32_t cur_base = (block ? block_max(block - 1) : uint32_t(-1)) + 1;
+            uint32_t cur_base = (block ? block_max(block - 1) : std::numeric_limits<uint32_t>::max()) + 1;
             m_cur_block_max = block_max(block);
             unpack_codecs(m_cur_block_size, block_data);
             m_freqs_block_data =
@@ -429,7 +429,7 @@ struct posting_list {
         void PISA_NOINLINE decode_freqs_block()
         {
             uint8_t const *next_block = decoders[cur_freq_codec](
-                m_freqs_block_data, m_freqs_buf.data(), uint32_t(-1), m_cur_block_size);
+                m_freqs_block_data, m_freqs_buf.data(), std::numeric_limits<uint32_t>::max(), m_cur_block_size);
             intrinsics::prefetch(next_block);
             m_freqs_decoded = true;
 

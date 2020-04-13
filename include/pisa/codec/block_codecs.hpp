@@ -149,7 +149,7 @@ namespace pisa {
                 inbuf[i] = inbuf[i - 1] + in[i];
             }
 
-            if (sum_of_values == uint32_t(-1)) {
+            if (sum_of_values == std::numeric_limits<uint32_t>::max()) {
                 sum_of_values = inbuf[n - 1];
                 TightVariableByte::encode_single(sum_of_values, out);
             }
@@ -166,7 +166,7 @@ namespace pisa {
         {
             assert(n <= block_size);
             uint8_t const* inbuf = in;
-            if (sum_of_values == uint32_t(-1)) {
+            if (sum_of_values == std::numeric_limits<uint32_t>::max()) {
                 inbuf = TightVariableByte::next(inbuf, sum_of_values);
             }
 
