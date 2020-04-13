@@ -169,18 +169,13 @@ namespace pisa {
             if (sum_of_values == std::numeric_limits<uint32_t>::max()) {
                 inbuf = TightVariableByte::next(inbuf, sum_of_values);
             }
-
             out[n - 1] = sum_of_values;
-            size_t read_interpolative = 0;
-            if (n > 1) {
-                bit_reader br((uint32_t const*)inbuf);
-                br.read_interpolative(out, n - 1, 0, sum_of_values);
-                for (size_t i = n - 1; i > 0; --i) {
-                    out[i] -= out[i - 1];
-                }
-                read_interpolative = ceil_div(br.position(), 8);
+            bit_reader br((uint32_t const*)inbuf);
+            br.read_interpolative(out, n - 1, 0, sum_of_values);
+            for (size_t i = n - 1; i > 0; --i) {
+                out[i] -= out[i - 1];
             }
-
+            size_t read_interpolative = ceil_div(br.position(), 8);
             return inbuf + read_interpolative;
         }
     };

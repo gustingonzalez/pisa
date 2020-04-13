@@ -44,11 +44,14 @@ TEST_CASE("block_codecs")
 {
     test_block_codec<pisa::streamvbyte_block>();
     test_block_codec<pisa::maskedvbyte_block>();
-    test_block_codec<pisa::interpolative_block>();
     test_block_codec<pisa::qmx_block>();
     test_block_codec<pisa::varintgb_block>();
     test_block_codec<pisa::simple8b_block>();
     test_block_codec<pisa::simple16_block>();
+
+    // The minimum list size required for bic (in multicompression) is 2.
+    test_block_codec<pisa::interpolative_block>(
+        {2, 16, pisa::varint_G8IU_block::block_size - 1, pisa::varint_G8IU_block::block_size});
 
     // SIMDBP and PFD implementations works with chunks equals to block size.
     test_block_codec<pisa::simdbp_block>({pisa::simdbp_block::block_size});

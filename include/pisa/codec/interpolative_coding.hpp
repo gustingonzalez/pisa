@@ -132,10 +132,6 @@ namespace pisa {
             size_t h = n / 2;
             uint32_t val = low + read_int(high - low + 1);
             out[h] = val;
-            if (n == 1) {
-                // optimization to avoid two unpredictable ifs
-                return;
-            }
             // the two ifs are a bit ugly but it is faster than postponing them
             if (h) {
                 read_interpolative(out, h, low, val);
