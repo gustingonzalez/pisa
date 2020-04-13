@@ -383,39 +383,6 @@ struct posting_list {
             uint8_t const *end;
         };
 
-        std::vector<block_data> get_blocks()
-        {
-            std::vector<block_data> blocks;
-
-            uint8_t const *ptr = m_blocks_data;
-            // static const uint64_t block_size = block_size;
-            std::vector<uint32_t> buf(block_size);
-            for (size_t b = 0; b < m_blocks; ++b) {
-                blocks.emplace_back();
-                uint32_t cur_block_size =
-                    ((b + 1) * block_size <= size()) ? block_size : (size() % block_size);
-
-                uint32_t cur_base = (b ? block_max(b - 1) : uint32_t(-1)) + 1;
-                uint32_t gaps_universe = block_max(b) - cur_base - (cur_block_size - 1);
-
-                blocks.back().index = b;
-                blocks.back().size = cur_block_size;
-                blocks.back().docs_begin = ptr;
-                blocks.back().doc_gaps_universe = gaps_universe;
-                blocks.back().max = block_max(b);
-
-                unpack_codecs(cur_block_size, ptr);
-                uint8_t const *freq_ptr =
-                    decoders[cur_doc_codec](ptr, buf.data(), gaps_universe, cur_block_size);
-                blocks.back().freqs_begin = freq_ptr;
-                ptr = decoders[cur_freq_codec](freq_ptr, buf.data(), uint32_t(-1), cur_block_size);
-                blocks.back().end = ptr;
-            }
-
-            assert(blocks.size() == num_blocks());
-            return blocks;
-        }
-
        private:
         void unpack_codecs(size_t n, uint8_t const *&block_data)
         {
