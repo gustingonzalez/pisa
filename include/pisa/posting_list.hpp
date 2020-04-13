@@ -386,14 +386,12 @@ struct posting_list {
        private:
         void unpack_codecs(size_t n, uint8_t const *&block_data)
         {
-            if PISA_LIKELY(n > 1) {
-                uint8_t codec = *block_data++;
-                cur_doc_codec = codec & 0b00001111;
-                cur_freq_codec = codec >> 4;
-            } else {
-                cur_doc_codec = single_dummy;
-                cur_freq_codec = single_vbyte;
-            }
+            bool block_is_greater_than_one = n > 1;
+            auto codecs = *block_data;
+            // Reads the codecs only if the current block is greater than 1.
+            cur_doc_codec = block_is_greater_than_one ? codecs & 15 : single_dummy;
+            cur_freq_codec = block_is_greater_than_one ? codecs >> 4 : single_vbyte;
+            block_data += block_is_greater_than_one;
         }
 
         uint32_t block_max(uint32_t block) const { return ((uint32_t const *)m_block_maxs)[block]; }
