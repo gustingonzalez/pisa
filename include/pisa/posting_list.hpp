@@ -389,7 +389,7 @@ struct posting_list {
             if PISA_LIKELY(n > 1) {
                 uint8_t codec = *block_data++;
                 cur_doc_codec = codec & 0b00001111;
-                cur_freq_codec = (codec & 0b11110000) >> 4;
+                cur_freq_codec = codec >> 4;
             } else {
                 cur_doc_codec = single_dummy;
                 cur_freq_codec = single_vbyte;
