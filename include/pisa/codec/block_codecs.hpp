@@ -326,4 +326,47 @@ namespace pisa {
             return src;
         }
     };
+
+    /**
+     * Allows to encode blocks consisting in only 1s. However, given that
+     * to each dgap in a block is subtracted a '1' (except for the first
+     * value of the docs list) these 1s actually will be decoded as 0s.
+     * Furthermore, the first value of the documents list can be any,
+     * since it can be recovered based on the 'sum of values' parameter.
+     */
+    struct all_ones_block {
+        static const uint64_t block_size = 128;
+
+        static bool is_encodable(uint32_t const* in, uint32_t sum_of_values, size_t n) {
+            bool encoding_freqs = sum_of_values == std::numeric_limits<uint32_t>::max();
+
+            // Checks first value if there are compressing freqs.
+            if (encoding_freqs && *in != 0) {
+                return false;
+            }
+
+            // Iterates over 'in', while as long as 'current value' is 0.
+            for (auto i = 1; i < n; i++) {
+                if (*++in > 0) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        static uint8_t const* decode(uint8_t const* in, uint32_t* out,
+                                     uint32_t sum_of_values, size_t n)
+        {
+            // Computes the first value in case of decoding documents. Note:
+            // 'sum_of_values' already has substracted 'n - 1', so that its
+            // value is assigned directly.
+            bool decoding_docs = sum_of_values != std::numeric_limits<uint32_t>::max();
+            *out++ = decoding_docs * sum_of_values;
+
+            // Sets remaining integers as 0. Why uses memset instead std::fill?
+            // See: https://lemire.me/blog/2020/01/20/filling-large-arrays-with-zeroes-quickly-in-c/
+            memset(out, 0, (n - 1) * 4);
+            return in;
+        }
+    };
 }

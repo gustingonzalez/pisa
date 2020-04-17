@@ -79,3 +79,38 @@ TEST_CASE("tight_variable_byte - single/next encode/decode")
         REQUIRE(val == values[1]);
     }
 }
+
+void test_all_ones_block(bool test_docs)
+{
+    uint32_t n = pisa::all_ones_block::block_size;
+    std::vector<uint32_t> values(n, 0);
+    values[0] = test_docs * rand();
+    uint32_t sum_of_values = test_docs ? values[0] : -1;
+
+    bool is_encodable = pisa::all_ones_block::is_encodable(values.data(), sum_of_values, n);
+    REQUIRE(is_encodable == true);
+
+    std::vector<uint8_t> encoded; // Dummy (not used actually).
+    std::vector<uint32_t> decoded(n);
+
+    pisa::all_ones_block::decode(encoded.data(), decoded.data(), sum_of_values, n);
+    REQUIRE(values == decoded);
+}
+
+TEST_CASE("all_ones_block - decode documents")
+{
+    test_all_ones_block(true);
+}
+
+TEST_CASE("all_ones_block - decode frequencies")
+{
+    test_all_ones_block(false);
+}
+
+TEST_CASE("all_ones_block - is encodable should return false")
+{
+    uint32_t n = pisa::all_ones_block::block_size;
+    std::vector<uint32_t> values(n, 0);
+    values[1] = 2 + rand() % (1 << 12);
+    REQUIRE(pisa::all_ones_block::is_encodable(values.data(), values[0], n) == false);
+}
