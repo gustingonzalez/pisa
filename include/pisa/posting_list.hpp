@@ -22,6 +22,7 @@ enum CodecTypes {
     block_qmx,
     block_optpfor,
     block_interpolative,
+    block_all_ones,
 
     // Codecs below are used as fallback in order to read posting lists
     // having only a single element. Note that no overhead is required
@@ -51,8 +52,9 @@ static decoder decoders[] {
     qmx_block::decode,
     optpfor_block::decode,
     interpolative_block::decode,
+    all_ones_block::decode,
     // Note that 'dummy parameters' are used (i.e. 'size_t') to allow generic
-    // calls when decoding, such as: decoders[10].decode(in, out, s, n)
+    // calls when decoding, such as: decoders[11].decode(in, out, s, n)
     [](uint8_t const *in, uint32_t *out, uint32_t sum_of_values, size_t) {
         out[0] = sum_of_values;
         return in;
@@ -186,6 +188,8 @@ struct posting_list {
                 out.insert(out.end(), buf.data(), buf.data() + buf.size());
                 return {single_vbyte, buf.size()};
             }
+        } else if (all_ones_block::is_encodable(in, sum_of_values, n)) {
+            return {block_all_ones, 0};
         }
 
         // Encodeds of 'in'.
