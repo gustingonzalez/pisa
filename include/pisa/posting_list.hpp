@@ -111,7 +111,7 @@ struct posting_list {
             *((uint32_t *)&out[begin_block_maxs + 4 * b]) = last_doc;
 
             // Partition size
-            out.push_back(cur_block_size);
+             TightVariableByte::encode_single(cur_block_size, out);
 
             // Reserves space for if n > 1.
             size_t codecs_index = 0;
@@ -343,7 +343,8 @@ struct posting_list {
             // static const uint64_t block_size = block_size;
             std::vector<uint32_t> buf(block_size);
             for (size_t b = 0; b < m_blocks; ++b) {
-                uint32_t cur_block_size = *ptr++;
+                uint32_t cur_block_size;
+                ptr = TightVariableByte::next(ptr, cur_block_size);
 
                 uint32_t cur_base = (b ? block_max(b - 1) : std::numeric_limits<uint32_t>::max()) + 1;
                 unpack_codecs(cur_block_size, ptr);
@@ -413,7 +414,7 @@ struct posting_list {
             // static const uint64_t block_size = block_size;
             uint32_t endpoint = block ? ((uint32_t const *)m_block_endpoints)[block - 1] : 0;
             uint8_t const *block_data = m_blocks_data + endpoint;
-            m_cur_block_size = *block_data++;
+            block_data = TightVariableByte::next(block_data, m_cur_block_size);
             uint32_t cur_base = (block ? block_max(block - 1) : std::numeric_limits<uint32_t>::max()) + 1;
             m_cur_block_max = block_max(block);
             unpack_codecs(m_cur_block_size, block_data);
