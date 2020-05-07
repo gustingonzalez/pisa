@@ -468,7 +468,8 @@ namespace pisa {
         static uint8_t const* decode(uint8_t const* in, uint32_t* out,
                                      uint32_t sum_of_values, size_t n)
         {
-            all_ones_block::decode(in, out, sum_of_values, n);
+            // Sets 'out' with zeros.
+            memset(out, 0, n * 4);
 
             // Decodes exceptions.
             uint32_t exceptions[block_size * 2];
@@ -490,8 +491,8 @@ namespace pisa {
                 out[exception_pos] += exception_value;
                 sum_of_exceptions += exception_value;
             }
-            // If there are decoding docs, rebuild 1st number subtracting 'sum_of_exceptions'.
-            out[0] -= decoding_docs * sum_of_exceptions;
+            // If there are decoding docs, rebuild 1st number.
+            out[0] += decoding_docs * (sum_of_values - sum_of_exceptions);
             return in;
         }
     };
