@@ -433,9 +433,6 @@ namespace pisa {
             // Output buffer.
             uint32_t buf[block_size * 2];
 
-            // Start of output buffer.
-            const uint32_t *const out_start = buf;
-
             // Pointer to buffer (required to unpack array).
             uint32_t *pbuf = buf;
 
@@ -443,19 +440,14 @@ namespace pisa {
             uint32_t const *in32 = reinterpret_cast<uint32_t const *>(in);
 
             // Decodes 1st 32-bit batch to compute the number of integers to decode.
+            const uint32_t *const pstart = buf;
             codec.unpackarray[codec.which(in32)](&pbuf, &in32);
-            size_t decoded_count = pbuf - out_start;
             n = (buf[0] + 1) * 2;
 
-            // Computes number of remaining integers, avoiding the decoded (adds 1
-            // to not consider the overhead).
-            int32_t remaining = n + 1 - decoded_count;
-
             // Decodes remaining batchs.
-            while (remaining > 0) {
-                uint32_t *const out_start_remaining = pbuf;
+            const uint32_t *const pend = pstart + n + 1; // Computes end.
+            while (pend > pbuf) {
                 codec.unpackarray[codec.which(in32)](&pbuf, &in32);
-                remaining -= (pbuf - out_start_remaining);
             }
 
             // Copy buffer into output, avoiding first element.
