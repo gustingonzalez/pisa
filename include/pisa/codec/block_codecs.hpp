@@ -410,8 +410,8 @@ namespace pisa {
             return exception_count;
         }
 
-        static bool encode(uint32_t const* in, uint32_t sum_of_values,
-                           size_t n, std::vector<uint8_t>& out)
+        static bool encode(uint32_t const *in, uint32_t sum_of_values,
+                           size_t n, std::vector<uint8_t> &out)
         {
             std::vector<uint32_t> exceptions;
             uint32_t exception_count = compute_exceptions(in, sum_of_values, n, exceptions);
@@ -421,9 +421,48 @@ namespace pisa {
             if (exception_count > n * 0.75) {
                 return false;
             }
-            out.push_back(exception_count - 1);
-            simple16_block::encode(exceptions.data(), sum_of_values, exception_count * 2, out);
+            exceptions.insert(exceptions.begin(), exception_count - 1);
+            simple16_block::encode(exceptions.data(), sum_of_values, exception_count * 2 + 1, out);
             return true;
+        }
+
+        static uint8_t const *decode_exceptions(uint8_t const *in, uint32_t *out, uint32_t &n)
+        {
+            thread_local FastPForLib::Simple16<false> codec;
+
+            // Output buffer.
+            uint32_t buf[block_size * 2];
+
+            // Start of output buffer.
+            const uint32_t *const out_start = buf;
+
+            // Pointer to buffer (required to unpack array).
+            uint32_t *pbuf = buf;
+
+            // 32-bit pointer to input.
+            uint32_t const *in32 = reinterpret_cast<uint32_t const *>(in);
+
+            // Decodes 1st 32-bit batch to compute the number of integers to decode.
+            codec.unpackarray[codec.which(in32)](&pbuf, &in32);
+            size_t decoded_count = pbuf - out_start;
+            n = (buf[0] + 1) * 2;
+
+            // Computes number of remaining integers, avoiding the decoded (adds 1
+            // to not consider the overhead).
+            int32_t remaining = n + 1 - decoded_count;
+
+            // Decodes remaining batchs.
+            while (remaining > 0) {
+                uint32_t *const out_start_remaining = pbuf;
+                codec.unpackarray[codec.which(in32)](&pbuf, &in32);
+                remaining -= (pbuf - out_start_remaining);
+            }
+
+            // Copy buffer into output, avoiding first element.
+            for (auto i = 0; i < n; i++) {
+                out[i] = buf[i + 1];
+            }
+            return reinterpret_cast<uint8_t const *>(in32);
         }
 
         static uint8_t const* decode(uint8_t const* in, uint32_t* out,
@@ -432,10 +471,10 @@ namespace pisa {
             all_ones_block::decode(in, out, sum_of_values, n);
 
             // Decodes exceptions.
-            uint32_t exception_count = *in++ + 1;
-            uint32_t to_decode = exception_count * 2;
-            uint32_t exceptions[to_decode];
-            in = simple16_block::decode(in, exceptions, sum_of_values, to_decode);
+            uint32_t exceptions[block_size * 2];
+            uint32_t to_decode;
+            in = decode_exceptions(in, exceptions, to_decode);
+            uint32_t exception_count = to_decode / 2;
 
             // Computes the first exception.
             bool decoding_docs = sum_of_values != std::numeric_limits<uint32_t>::max();
