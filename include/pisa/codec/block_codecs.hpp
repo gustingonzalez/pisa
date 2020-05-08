@@ -430,8 +430,8 @@ namespace pisa {
         {
             thread_local FastPForLib::Simple16<false> codec;
 
-            // Output buffer.
-            uint32_t buf[block_size * 2];
+            // Output buffer of max batch size.
+            uint32_t buf[28];
 
             // Pointer to buffer (required to unpack array).
             uint32_t *pbuf = buf;
@@ -439,21 +439,20 @@ namespace pisa {
             // 32-bit pointer to input.
             uint32_t const *in32 = reinterpret_cast<uint32_t const *>(in);
 
-            // Decodes 1st 32-bit batch to compute the number of integers to decode.
-            const uint32_t *const pstart = buf;
+            // Decodes the 1st 32-bit batch to get the number of integers to decode.
             codec.unpackarray[codec.which(in32)](&pbuf, &in32);
+            const uint32_t *const pstart = out;
+            std::copy(buf + 1, pbuf, out);
+            uint32_t readed = pbuf - buf - 1;
+            out += readed;
             n = (buf[0] + 1) * 2;
 
-            // Decodes remaining batchs.
-            const uint32_t *const pend = pstart + n + 1; // Computes end.
-            while (pend > pbuf) {
-                codec.unpackarray[codec.which(in32)](&pbuf, &in32);
+            // Decodes remaining batches.
+            const uint32_t *const pend = pstart + n; // Computes end.
+            while (pend > out) {
+                codec.unpackarray[codec.which(in32)](&out, &in32);
             }
 
-            // Copy buffer into output, avoiding first element.
-            for (auto i = 0; i < n; i++) {
-                out[i] = buf[i + 1];
-            }
             return reinterpret_cast<uint8_t const *>(in32);
         }
 
