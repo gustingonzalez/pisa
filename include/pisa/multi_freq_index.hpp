@@ -27,15 +27,16 @@ class multi_freq_index {
                               DocsIterator docs_begin,
                               FreqsIterator freqs_begin,
                               uint64_t /* occurrences */)
-            -> std::pair<std::vector<pisa::ChunkStatistic>,
-                         std::vector<pisa::ChunkStatistic>>
+            -> std::tuple<std::vector<pisa::ChunkStatistic>,
+                         std::vector<pisa::ChunkStatistic>,
+                         std::vector<uint32_t>>
         {
             if (!n)
                 throw std::invalid_argument("List must be nonempty");
-            auto [doc_codecs, freq_codecs] =
+            auto [doc_codecs, freq_codecs, partitions] =
                 posting_list<Profile>::write(m_lists, n, docs_begin, freqs_begin);
             m_endpoints.push_back(m_lists.size());
-            return {doc_codecs, freq_codecs};
+            return {doc_codecs, freq_codecs, partitions};
         }
 
         /*template <typename BlockDataRange>

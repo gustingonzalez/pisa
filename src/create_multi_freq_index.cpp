@@ -22,6 +22,14 @@
 
 using namespace pisa;
 
+
+void write_partition_stats(std::vector<uint32_t> partitions, ofstream &output) {
+    for (auto &partition : partitions) {
+        output<<partition<<" ";
+    }
+    output<<endl;
+}
+
 template <typename InputCollection, typename CollectionType>
 void create_collection(InputCollection const &input,
                        pisa::global_parameters const &params,
@@ -42,12 +50,14 @@ void create_collection(InputCollection const &input,
 
         ofstream odstats;
         ofstream ofstats;
+        ofstream opstats;
         if (stats) {
             odstats.open(output_filename.value() + ".stats.docs");
             pisa::MulticompressionStatsManager::write_headers(odstats);
             ofstats.open(output_filename.value() + ".stats.freqs");
             pisa::MulticompressionStatsManager::write_headers(ofstats);
         }
+        opstats.open(output_filename.value() + ".stats.partitions");
 
         auto plist_id = 0;
         for (auto const &plist : input) {
@@ -55,9 +65,10 @@ void create_collection(InputCollection const &input,
             size = plist.docs.size();
             freqs_sum =
                 std::accumulate(plist.freqs.begin(), plist.freqs.begin() + size, uint64_t(0));
-            auto [dstats, fstats] =
+            auto [dstats, fstats, partitions] =
                 builder.add_posting_list(size, plist.docs.begin(), plist.freqs.begin(), freqs_sum);
 
+            write_partition_stats(partitions, opstats);
             if (stats) {
                 pisa::MulticompressionStatsManager::write_stats(plist_id, size, dstats, odstats);
                 pisa::MulticompressionStatsManager::write_stats(plist_id, size, fstats, ofstats);

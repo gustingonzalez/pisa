@@ -75,7 +75,8 @@ struct posting_list {
                       uint32_t n,
                       DocsIterator docs_begin,
                       FreqsIterator freqs_begin)
-        -> std::pair<std::vector<pisa::ChunkStatistic>, std::vector<pisa::ChunkStatistic>>
+        -> std::tuple<std::vector<pisa::ChunkStatistic>, std::vector<pisa::ChunkStatistic>,
+                      std::vector<uint32_t>>
     {
         TightVariableByte::encode_single(n, out);
 
@@ -147,7 +148,7 @@ struct posting_list {
             }
             block_base = last_doc + 1;
         }
-        return {dcstats, fcstats};
+        return {dcstats, fcstats, partitions};
     }
 
     template <typename BlockDataRange>
