@@ -201,9 +201,9 @@ struct posting_list {
                 out.insert(out.end(), buf.data(), buf.data() + buf.size());
                 return {single_vbyte, buf.size()};
             }
-        }/* else if (all_ones_block::is_encodable(in, sum_of_values, n)) {
+        } else if (all_ones_block::is_encodable(in, sum_of_values, n)) {
             return {block_all_ones, 0};
-        }*/
+        }
 
         // Encodeds of 'in'.
         std::vector<std::vector<uint8_t>> encoded(11);
