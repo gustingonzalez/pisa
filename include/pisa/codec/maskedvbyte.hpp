@@ -15,9 +15,9 @@ struct maskedvbyte_block {
                        size_t n,
                        std::vector<uint8_t> &out) {
 
-        assert(n <= block_size);
+        // assert(n <= block_size);
         uint32_t *src = const_cast<uint32_t *>(in);
-        thread_local std::vector<uint8_t> buf(2 * block_size * sizeof(uint32_t));
+        std::vector<uint8_t> buf(n * 5);
         size_t out_len = vbyte_encode(src, n, buf.data());
         out.insert(out.end(), buf.data(), buf.data() + out_len);
     }
@@ -25,7 +25,7 @@ struct maskedvbyte_block {
                                  uint32_t *out,
                                  uint32_t sum_of_values,
                                  size_t n) {
-        assert(n <= block_size);
+        // assert(n <= block_size);
         auto read = masked_vbyte_decode(in, out, n);
         return in + read;
     }
