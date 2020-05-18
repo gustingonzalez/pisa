@@ -233,14 +233,14 @@ struct posting_list {
         interpolative_block::encode(in, sum_of_values, n, encoded[block_interpolative]);
         /*streamvbyte_block::encode(in, sum_of_values, n, encoded[block_streamvbyte]);
         */maskedvbyte_block::encode(in, sum_of_values, n, encoded[block_maskedvbyte]);
-        /*simple8b_block::encode(in, sum_of_values, n, encoded[block_simple8b]);
-        */simple16_block::encode(in, sum_of_values, n, encoded[block_simple16]);
+        simple8b_block::encode(in, sum_of_values, n, encoded[block_simple8b]);
+        simple16_block::encode(in, sum_of_values, n, encoded[block_simple16]);
         /*varintgb_block::encode(in, sum_of_values, n, encoded[block_varintgb]);
         qmx_block::encode(in, sum_of_values, n, encoded[block_qmx]);*/
         sizes[block_interpolative] = encoded[block_interpolative].size();
         /*sizes[block_streamvbyte] = encoded[block_streamvbyte].size();*/
-        sizes[block_maskedvbyte] = encoded[block_maskedvbyte].size();/*
-        sizes[block_simple8b] = encoded[block_simple8b].size();*/
+        sizes[block_maskedvbyte] = encoded[block_maskedvbyte].size();
+        sizes[block_simple8b] = encoded[block_simple8b].size();
         sizes[block_simple16] = encoded[block_simple16].size();/*
         sizes[block_varintgb] = encoded[block_varintgb].size();
         sizes[block_qmx] = encoded[block_qmx].size();*/
