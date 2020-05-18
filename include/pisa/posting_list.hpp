@@ -213,7 +213,7 @@ struct posting_list {
 
         /*if(many_ones_block::encode(in, sum_of_values, n, encoded[block_many_ones])) {
            sizes[block_many_ones] = encoded[block_many_ones].size(); 
-        }
+        }*/
 
         // Encodes according the minimum integers required for varint.
         if (n >= 8) {
@@ -222,7 +222,7 @@ struct posting_list {
         }
 
         // Encodes considering that BP and PFD only handle chunks of block size.
-        if (n == block_size) {
+        /*if (n == block_size) {
             simdbp_block::encode(in, sum_of_values, n, encoded[block_simdbp]);
             optpfor_block::encode(in, sum_of_values, n, encoded[block_optpfor]);
             sizes[block_simdbp] = encoded[block_simdbp].size();

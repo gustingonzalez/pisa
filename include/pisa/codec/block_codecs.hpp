@@ -285,8 +285,8 @@ namespace pisa {
                            size_t n, std::vector<uint8_t>& out)
         {
             thread_local codec_type varint_codec;
-            thread_local std::vector<uint8_t> buf(2 * 4 * block_size);
-            assert(n <= block_size);
+            std::vector<uint8_t> buf(2 * 4 * n);
+            // assert(n <= block_size);
             size_t out_len = buf.size();
 
             const uint32_t * src = in;
@@ -306,7 +306,7 @@ namespace pisa {
                                      uint32_t sum_of_values, size_t n)
         {
             static codec_type varint_codec; // decodeBlock is thread-safe
-            assert(n <= block_size);
+            // assert(n <= block_size);
             size_t out_len = 0;
             uint8_t const* src = in;
             uint32_t* dst = out;
