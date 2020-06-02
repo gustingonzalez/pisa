@@ -11,7 +11,7 @@ struct simple16_block {
                        uint32_t /* sum_of_values */,
                        size_t n,
                        std::vector<uint8_t> &out) {
-        assert(n <= block_size);
+        // assert(n <= block_size);
         thread_local FastPForLib::Simple16<false> codec;
         thread_local std::vector<uint8_t> buf(2 * 8 * block_size);
         size_t out_len = buf.size();
@@ -24,7 +24,7 @@ struct simple16_block {
                                  uint32_t *out,
                                  uint32_t /* sum_of_values */,
                                  size_t n) {
-        assert(n <= block_size);
+        // assert(n <= block_size);
         FastPForLib::Simple16<false> codec;
         std::vector<uint32_t> buf(2 * block_size);
 

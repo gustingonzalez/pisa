@@ -21,6 +21,7 @@ enum CodecTypes {
     block_streamvbyte,
     block_qmx,
     block_optpfor,
+    block_many_ones,
     block_interpolative,
     block_all_ones,
 
@@ -51,6 +52,7 @@ static decoder decoders[] {
     streamvbyte_block::decode,
     qmx_block::decode,
     optpfor_block::decode,
+    many_ones_block::decode,
     interpolative_block::decode,
     all_ones_block::decode,
     // Note that 'dummy parameters' are used (i.e. 'size_t') to allow generic
@@ -193,10 +195,14 @@ struct posting_list {
         }
 
         // Encodeds of 'in'.
-        std::vector<std::vector<uint8_t>> encoded(10);
+        std::vector<std::vector<uint8_t>> encoded(11);
 
         // Starts encodes sizes in the max possible value.
-        std::vector<size_t> sizes(10, SIZE_MAX);
+        std::vector<size_t> sizes(11, SIZE_MAX);
+
+        if(many_ones_block::encode(in, sum_of_values, n, encoded[block_many_ones])) {
+           sizes[block_many_ones] = encoded[block_many_ones].size(); 
+        }
 
         // Encodes according the minimum integers required for varint.
         if (n >= 8) {

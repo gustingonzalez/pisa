@@ -97,15 +97,9 @@ void test_all_ones_block(bool test_docs)
     REQUIRE(values == decoded);
 }
 
-TEST_CASE("all_ones_block - decode documents")
-{
-    test_all_ones_block(true);
-}
+TEST_CASE("all_ones_block - decode documents") { test_all_ones_block(true); }
 
-TEST_CASE("all_ones_block - decode frequencies")
-{
-    test_all_ones_block(false);
-}
+TEST_CASE("all_ones_block - decode frequencies") { test_all_ones_block(false); }
 
 TEST_CASE("all_ones_block - is encodable should return false")
 {
@@ -114,3 +108,82 @@ TEST_CASE("all_ones_block - is encodable should return false")
     values[1] = 2 + rand() % (1 << 12);
     REQUIRE(pisa::all_ones_block::is_encodable(values.data(), values[0], n) == false);
 }
+
+void test_compute_exceptions(bool test_docs)
+{
+    uint32_t n = pisa::all_ones_block::block_size;
+    std::vector<uint32_t> values(n, 0);
+    uint32_t exception_count = 0;
+    uint32_t expected_exceptions_positions[n];
+    uint32_t expected_exceptions[n];
+    int32_t last_exception_pos = test_docs ? 0 : -1;
+
+    // Adds 'n / 2' exceptions.
+    for (int i = test_docs; i < n; i += 2) {
+        // Generates random value.
+        uint32_t value = 1 + (rand() % (1 << 12));
+        values[i] = value;
+
+        // For documents, the value of the first integer no matters.
+        uint32_t gap = i - last_exception_pos - 1;
+        expected_exceptions_positions[exception_count] = gap;
+        expected_exceptions[exception_count] = value - 1;
+        exception_count++;
+        last_exception_pos = i;
+    }
+
+    // Expected exceptions.
+    std::vector<uint32_t> expected;
+    expected.insert(expected.end(),
+                    expected_exceptions_positions,
+                    expected_exceptions_positions + exception_count);
+    expected.insert(expected.end(), expected_exceptions, expected_exceptions + exception_count);
+
+    // Computed exceptions.
+    std::vector<uint32_t> computed;
+    uint32_t sum_of_values = -1;
+    if (test_docs) {
+        sum_of_values = std::accumulate(values.begin(), values.end(), 0);
+    }
+    uint32_t computed_exception_count =
+        pisa::many_ones_block::compute_exceptions(values.data(), sum_of_values, n, computed);
+
+    REQUIRE(exception_count == computed_exception_count);
+    REQUIRE(expected == computed);
+}
+
+void test_decode_many_ones_block(bool test_docs)
+{
+    uint32_t n = pisa::all_ones_block::block_size - 1;
+    std::vector<uint32_t> values(n, 0);
+
+    // Adds 'n / 2' exceptions.
+    for (auto i = 0; i < n; i += 2) {
+        values[i] = 1 + (rand() % (1 << 12));
+    }
+
+    // Verifies encode/decode.
+    uint32_t sum_of_values = -1;
+    if (test_docs) {
+        sum_of_values = std::accumulate(values.begin(), values.end(), 0);
+    }
+    std::vector<uint8_t> encoded;
+    std::vector<uint32_t> decoded(n);
+    pisa::many_ones_block::encode(values.data(), sum_of_values, n, encoded);
+    uint8_t const *out =
+        pisa::many_ones_block::decode(encoded.data(), decoded.data(), sum_of_values, n);
+
+    // Checks decoded values.
+    REQUIRE(values == decoded);
+
+    // Checks readed bytes.
+    REQUIRE(encoded.size() == out - encoded.data());
+}
+
+TEST_CASE("many_ones_block - compute documents exceptions") { test_compute_exceptions(true); }
+
+TEST_CASE("many_ones_block - compute frequencies exceptions") { test_compute_exceptions(false); }
+
+TEST_CASE("many_ones_block - encode documents test") { test_decode_many_ones_block(true); }
+
+TEST_CASE("many_ones_block - encode frequencies test") { test_decode_many_ones_block(false); }

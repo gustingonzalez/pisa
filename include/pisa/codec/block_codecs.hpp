@@ -5,9 +5,10 @@
 
 #include "VarIntG8IU.h"
 #include "interpolative_coding.hpp"
-#include "util/util.hpp"
+#include "simple16.hpp"
 #include "util/compiler_attribute.hpp"
 #include "util/likely.hpp"
+#include "util/util.hpp"
 
 namespace pisa {
 
@@ -366,6 +367,92 @@ namespace pisa {
             // Sets remaining integers as 0. Why uses memset instead std::fill?
             // See: https://lemire.me/blog/2020/01/20/filling-large-arrays-with-zeroes-quickly-in-c/
             memset(out, 0, (n - 1) * 4);
+            return in;
+        }
+    };
+
+    /**
+     * Allows to encode a block consisting in at least a 25% of 1s with
+     * 'all ones'; and saving the exceptions and its positions (actually
+     * its gaps) by using Simple16.
+     */
+    struct many_ones_block {
+        static const uint64_t block_size = 128;
+
+        static uint32_t compute_exceptions(uint32_t const* in, uint32_t sum_of_values,
+                                           size_t n, std::vector<uint32_t>& out) {
+            // If there are encoding docs, 'curr_value_pos' must be start from 1.
+            uint32_t curr_value_pos = sum_of_values != std::numeric_limits<uint32_t>::max();
+
+            thread_local uint32_t exceptions[block_size * 2];        // Buffer of positions + exceptions (gaps).
+            uint32_t exception_count = 0;                            // Exception count (returned value).
+            int32_t last_exception_pos = curr_value_pos ? 0 : -1;    // Used to compute position gaps.
+
+            // Computes exceptions.
+            for (; curr_value_pos < n; curr_value_pos++) {
+                // Checks if the current value is an exception.
+                uint32_t value = in[curr_value_pos];
+                if (value == 0)
+                    continue;
+                
+                // Saves exception position gap, no subtracting the value 1 to
+                // the first index because, when encoding freqs, it can be 0.
+                uint32_t gap = curr_value_pos - last_exception_pos - 1;
+                exceptions[exception_count] = gap;
+
+                // Saves exception.
+                exceptions[block_size + exception_count] = value - 1;
+                last_exception_pos = curr_value_pos;
+                exception_count++;
+            }
+            out.insert(out.end(), exceptions, exceptions + exception_count);
+            out.insert(out.end(), exceptions + block_size, exceptions + block_size + exception_count);
+            return exception_count;
+        }
+
+        static bool encode(uint32_t const* in, uint32_t sum_of_values,
+                           size_t n, std::vector<uint8_t>& out)
+        {
+            std::vector<uint32_t> exceptions;
+            uint32_t exception_count = compute_exceptions(in, sum_of_values, n, exceptions);
+
+            // If the exceptions covers 75% of the list, there is not much
+            // sense to encoding using 'many ones'.
+            if (exception_count > n * 0.75) {
+                return false;
+            }
+            out.push_back(exception_count - 1);
+            simple16_block::encode(exceptions.data(), sum_of_values, exception_count * 2, out);
+            return true;
+        }
+
+        static uint8_t const* decode(uint8_t const* in, uint32_t* out,
+                                     uint32_t sum_of_values, size_t n)
+        {
+            all_ones_block::decode(in, out, sum_of_values, n);
+
+            // Decodes exceptions.
+            uint32_t exception_count = *in++ + 1;
+            uint32_t to_decode = exception_count * 2;
+            uint32_t exceptions[to_decode];
+            in = simple16_block::decode(in, exceptions, sum_of_values, to_decode);
+
+            // Computes the first exception.
+            bool decoding_docs = sum_of_values != std::numeric_limits<uint32_t>::max();
+            uint32_t exception_pos = exceptions[0] + decoding_docs;
+            uint32_t exception_value_pos = exception_count;
+            out[exception_pos] += exceptions[exception_value_pos] + 1;
+
+            // Computes remaining exceptions.
+            uint32_t sum_of_exceptions = out[exception_pos];
+            for(auto i = 1; i < exception_count; i++) {
+                exception_pos += exceptions[i] + 1;
+                uint32_t exception_value = exceptions[++exception_value_pos] + 1;
+                out[exception_pos] += exception_value;
+                sum_of_exceptions += exception_value;
+            }
+            // If there are decoding docs, rebuild 1st number subtracting 'sum_of_exceptions'.
+            out[0] -= decoding_docs * sum_of_exceptions;
             return in;
         }
     };
