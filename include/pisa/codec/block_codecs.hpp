@@ -378,8 +378,18 @@ namespace pisa {
      */
     struct many_ones_block {
         static const uint64_t block_size = 128;
+        
+        // % of admitted exceptions.
+        static constexpr float exception_threshold = 0.75f;
 
-        static uint32_t compute_exceptions(uint32_t const* in, uint32_t sum_of_values,
+        static uint32_t count_exceptions(uint32_t const* in, uint32_t sum_of_values, size_t n)
+        {
+            // If there are encoding docs, 'curr_value_pos' must be start from 1.
+            uint32_t curr_value_pos = sum_of_values != std::numeric_limits<uint32_t>::max();
+            return std::count_if(in + curr_value_pos, in + n, [] (uint32_t x) { return x > 0; } );
+        }
+
+        static void compute_exceptions(uint32_t const* in, uint32_t sum_of_values,
                                            size_t n, std::vector<uint32_t>& out) {
             // If there are encoding docs, 'curr_value_pos' must be start from 1.
             uint32_t curr_value_pos = sum_of_values != std::numeric_limits<uint32_t>::max();
@@ -407,21 +417,17 @@ namespace pisa {
             }
             out.insert(out.end(), exceptions, exceptions + exception_count);
             out.insert(out.end(), exceptions + block_size, exceptions + block_size + exception_count);
-            return exception_count;
         }
 
         static bool encode(uint32_t const *in, uint32_t sum_of_values,
                            size_t n, std::vector<uint8_t> &out)
         {
-            std::vector<uint32_t> exceptions;
-            uint32_t exception_count = compute_exceptions(in, sum_of_values, n, exceptions);
-
-            // If the exceptions covers 75% of the list, there is not much
-            // sense to encoding using 'many ones'.
-            if (exception_count > n * 0.75) {
+            uint32_t exception_count = count_exceptions(in, sum_of_values, n);
+            if (exception_count > n * exception_threshold) {
                 return false;
             }
-            exceptions.insert(exceptions.begin(), exception_count - 1);
+            std::vector<uint32_t> exceptions(1, exception_count - 1);
+            compute_exceptions(in, sum_of_values, n, exceptions);
             simple16_block::encode(exceptions.data(), sum_of_values, exception_count * 2 + 1, out);
             return true;
         }

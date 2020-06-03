@@ -145,8 +145,8 @@ void test_compute_exceptions(bool test_docs)
     if (test_docs) {
         sum_of_values = std::accumulate(values.begin(), values.end(), 0);
     }
-    uint32_t computed_exception_count =
-        pisa::many_ones_block::compute_exceptions(values.data(), sum_of_values, n, computed);
+    uint32_t computed_exception_count = pisa::many_ones_block::count_exceptions(values.data(), sum_of_values, n);
+    pisa::many_ones_block::compute_exceptions(values.data(), sum_of_values, n, computed);
 
     REQUIRE(exception_count == computed_exception_count);
     REQUIRE(expected == computed);
