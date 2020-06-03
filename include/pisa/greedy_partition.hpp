@@ -2,6 +2,11 @@
 
 namespace pisa {
     struct GreedyPartition {
+
+        static size_t compute_weight(uint32_t end, uint32_t block_size) {
+            return end / block_size;
+        }
+
         template <typename Iterator>
         static std::vector<uint32_t> compute(Iterator list, uint32_t n) {
             std::vector<uint32_t> partitions;
@@ -13,12 +18,12 @@ namespace pisa {
             uint32_t start = 0;
             uint32_t end = step < n ? step - 1 : n - 1;
             uint32_t block_size = end - start + 1;
-            uint32_t weight = list[end] / block_size;
+            size_t weight = compute_weight(list[end], block_size);
             bool increment_window = false;
 
             uint32_t end_candidate;
             uint32_t block_size_cantidate;
-            uint32_t weight_candidate;
+            size_t weight_candidate;
             do {
                 if (increment_window) {
                     // Updates end, weight and block size based on candidate.
@@ -30,7 +35,7 @@ namespace pisa {
 
                 end_candidate = (end + step) < n ? (end + step) : n - 1;
                 block_size_cantidate = (end_candidate - start) + 1;
-                weight_candidate = list[end_candidate] / block_size_cantidate;
+                weight_candidate = compute_weight(list[end_candidate], block_size_cantidate);
 
                 // If the previously computed weight is lesser than the new candidate...
                 if (weight_candidate > weight) {
@@ -41,7 +46,7 @@ namespace pisa {
                     start = end + 1;
                     end = start + step < n ? start + (step - 1) : n - 1;
                     block_size = (end - start) + 1;
-                    weight = list[end] / block_size;
+                    weight = compute_weight(list[end], block_size);
                 } else {
                     increment_window = true;
                 }
