@@ -336,7 +336,7 @@ namespace pisa {
      * since it can be recovered based on the 'sum of values' parameter.
      */
     struct all_ones_block {
-        static const uint64_t block_size = 128;
+        static const uint64_t block_size = 256;
 
         static bool is_encodable(uint32_t const* in, uint32_t sum_of_values, size_t n) {
             bool encoding_freqs = sum_of_values == std::numeric_limits<uint32_t>::max();
@@ -377,7 +377,7 @@ namespace pisa {
      * its gaps) by using Simple16.
      */
     struct many_ones_block {
-        static const uint64_t block_size = 128;
+        static const uint64_t block_size = 256;
         
         // % of admitted exceptions.
         static constexpr float exception_threshold = 0.75f;
