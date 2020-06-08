@@ -165,18 +165,22 @@ namespace pisa {
                                                  uint32_t sum_of_values, size_t n)
         {
             assert(n <= block_size);
-            uint8_t const* inbuf = in;
             if (sum_of_values == std::numeric_limits<uint32_t>::max()) {
-                inbuf = TightVariableByte::next(inbuf, sum_of_values);
+                in = TightVariableByte::next(in, sum_of_values);
             }
-            out[n - 1] = sum_of_values;
-            bit_reader br((uint32_t const*)inbuf);
-            br.read_interpolative(out, n - 1, 0, sum_of_values);
-            for (size_t i = n - 1; i > 0; --i) {
-                out[i] -= out[i - 1];
+            // Assigns last array value and read remaining.
+            out[--n] = sum_of_values;
+            bit_reader br((uint32_t const*)in);
+            br.read_interpolative(out, n, 0, sum_of_values);
+
+            // Computes dgaps of the decoded array.
+            for (; n > 0; --n) {
+                out[n] -= out[n - 1];
             }
-            size_t read_interpolative = ceil_div(br.position(), 8);
-            return inbuf + read_interpolative;
+            
+            // Computes the number of read bytes.
+            size_t readed = ceil_div(br.position(), 8);
+            return in + readed;
         }
     };
 
