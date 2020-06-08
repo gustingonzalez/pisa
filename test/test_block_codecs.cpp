@@ -140,13 +140,12 @@ void test_compute_exceptions(bool test_docs)
     expected.insert(expected.end(), expected_exceptions, expected_exceptions + exception_count);
 
     // Computed exceptions.
-    std::vector<uint32_t> computed;
     uint32_t sum_of_values = -1;
     if (test_docs) {
         sum_of_values = std::accumulate(values.begin(), values.end(), 0);
     }
     uint32_t computed_exception_count = pisa::many_ones_block::count_exceptions(values.data(), sum_of_values, n);
-    pisa::many_ones_block::compute_exceptions(values.data(), sum_of_values, n, computed);
+    auto computed = pisa::many_ones_block::compute_exceptions(values.data(), sum_of_values, n);
 
     REQUIRE(exception_count == computed_exception_count);
     REQUIRE(expected == computed);

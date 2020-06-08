@@ -389,16 +389,20 @@ namespace pisa {
             return std::count_if(in + curr_value_pos, in + n, [] (uint32_t x) { return x > 0; } );
         }
 
-        static void compute_exceptions(uint32_t const* in, uint32_t sum_of_values,
-                                           size_t n, std::vector<uint32_t>& out) {
-            // If there are encoding docs, 'curr_value_pos' must be start from 1.
-            uint32_t curr_value_pos = sum_of_values != std::numeric_limits<uint32_t>::max();
+        static std::vector<uint32_t> compute_exceptions(uint32_t const* in, uint32_t sum_of_values, size_t n) {
+            uint32_t exception_count = count_exceptions(in, sum_of_values, n);
+            std::vector<uint32_t> exceptions(exception_count * 2);
 
-            thread_local uint32_t exceptions[block_size * 2];        // Buffer of positions + exceptions (gaps).
-            uint32_t exception_count = 0;                            // Exception count (returned value).
-            int32_t last_exception_pos = curr_value_pos ? 0 : -1;    // Used to compute position gaps.
+            // If there are encoding docs, 'curr_value_pos' must be start from 1
+            // because, given the case, the first element can be recovered based
+            // on the 'sum of values'.
+            uint32_t curr_value_pos = sum_of_values != std::numeric_limits<uint32_t>::max();
+            
+            // Used to compute position gaps.
+            int32_t last_exception_pos = curr_value_pos ? 0 : -1;
 
             // Computes exceptions.
+            uint32_t current_exception_index = 0;
             for (; curr_value_pos < n; curr_value_pos++) {
                 // Checks if the current value is an exception.
                 uint32_t value = in[curr_value_pos];
@@ -408,15 +412,14 @@ namespace pisa {
                 // Saves exception position gap, no subtracting the value 1 to
                 // the first index because, when encoding freqs, it can be 0.
                 uint32_t gap = curr_value_pos - last_exception_pos - 1;
-                exceptions[exception_count] = gap;
+                exceptions[current_exception_index] = gap;
 
                 // Saves exception.
-                exceptions[block_size + exception_count] = value - 1;
+                exceptions[exception_count + current_exception_index] = value - 1;
                 last_exception_pos = curr_value_pos;
-                exception_count++;
+                current_exception_index++;
             }
-            out.insert(out.end(), exceptions, exceptions + exception_count);
-            out.insert(out.end(), exceptions + block_size, exceptions + block_size + exception_count);
+            return exceptions;
         }
 
         static bool encode(uint32_t const *in, uint32_t sum_of_values,
@@ -426,8 +429,11 @@ namespace pisa {
             if (exception_count > n * exception_threshold) {
                 return false;
             }
-            std::vector<uint32_t> exceptions(1, exception_count - 1);
-            compute_exceptions(in, sum_of_values, n, exceptions);
+            auto exceptions = compute_exceptions(in, sum_of_values, n);
+            
+            // Adds an initial marker for the exception count.
+            exceptions.insert(exceptions.begin(), exception_count - 1);
+            
             simple16_block::encode(exceptions.data(), sum_of_values, exception_count * 2 + 1, out);
             return true;
         }
