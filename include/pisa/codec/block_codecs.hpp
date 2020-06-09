@@ -475,7 +475,7 @@ namespace pisa {
             memset(out, 0, n * 4);
 
             // Decodes exceptions.
-            uint32_t exceptions[block_size * 2];
+            uint32_t exceptions[n * 2 + 28];
             uint32_t to_decode;
             in = decode_exceptions(in, exceptions, to_decode);
             uint32_t exception_count = to_decode / 2;

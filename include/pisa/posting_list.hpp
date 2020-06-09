@@ -211,9 +211,9 @@ struct posting_list {
         // Starts encodes sizes in the max possible value.
         std::vector<size_t> sizes(11, SIZE_MAX);
 
-        /*if(many_ones_block::encode(in, sum_of_values, n, encoded[block_many_ones])) {
+        if(many_ones_block::encode(in, sum_of_values, n, encoded[block_many_ones])) {
            sizes[block_many_ones] = encoded[block_many_ones].size(); 
-        }*/
+        }
 
         // Encodes according the minimum integers required for varint.
         if (n >= 8) {
