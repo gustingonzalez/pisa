@@ -221,13 +221,13 @@ struct posting_list {
             sizes[block_varintg8iu] = encoded[block_varintg8iu].size();
         }
 
-        // Encodes considering that BP and PFD only handle chunks of block size.
-        /*if (n == block_size) {
+        // Encodes considering that BP and PFD only handle chunks of 128.
+        if (n == 128) {
             simdbp_block::encode(in, sum_of_values, n, encoded[block_simdbp]);
             optpfor_block::encode(in, sum_of_values, n, encoded[block_optpfor]);
             sizes[block_simdbp] = encoded[block_simdbp].size();
             sizes[block_optpfor] = encoded[block_optpfor].size();
-        }*/
+        }
 
         // Encoders that don't need a special number of integers.
         interpolative_block::encode(in, sum_of_values, n, encoded[block_interpolative]);
