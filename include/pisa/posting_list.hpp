@@ -82,8 +82,10 @@ struct posting_list {
         // uint64_t block_size = BlockCodec::block_size;
         vector<uint32_t> partitions = pisa::GreedyPartition::compute(docs_begin, n);
         uint64_t blocks = partitions.size();
-        TightVariableByte::encode_single(blocks, out);
-        
+        if (n > 1) {
+            TightVariableByte::encode_single(blocks, out);
+        }
+
         size_t begin_block_maxs = out.size();
         size_t begin_block_endpoints = begin_block_maxs + 4 * blocks;
         size_t begin_blocks = begin_block_endpoints + 4 * (blocks - 1);
@@ -256,7 +258,11 @@ struct posting_list {
                             size_t term_id = 0)
         {
             m_base = TightVariableByte::decode(data, &m_n, 1);
-            m_base = TightVariableByte::decode(m_base, &m_blocks, 1);
+            if(m_n > 1) {
+                m_base = TightVariableByte::decode(m_base, &m_blocks, 1);
+            } else {
+                m_blocks = 1;
+            }
             m_block_maxs = m_base;
             m_block_endpoints = m_block_maxs + 4 * m_blocks;
             m_blocks_data = m_block_endpoints + 4 * (m_blocks - 1);
