@@ -142,9 +142,9 @@ namespace pisa {
         static void encode(uint32_t const* in, uint32_t sum_of_values,
                            size_t n, std::vector<uint8_t>& out)
         {
-            assert(n <= block_size);
-            thread_local std::vector<uint32_t> inbuf(block_size);
-            thread_local std::vector<uint32_t> outbuf;
+            // assert(n <= block_size);
+            std::vector<uint32_t> inbuf(n);
+            std::vector<uint32_t> outbuf;
             inbuf[0] = *in;
             for (size_t i = 1; i < n; ++i) {
                 inbuf[i] = inbuf[i - 1] + in[i];
@@ -165,7 +165,7 @@ namespace pisa {
         static uint8_t const* PISA_NOINLINE decode(uint8_t const* in, uint32_t* out,
                                                  uint32_t sum_of_values, size_t n)
         {
-            assert(n <= block_size);
+            // assert(n <= block_size);
             if (sum_of_values == std::numeric_limits<uint32_t>::max()) {
                 in = TightVariableByte::next(in, sum_of_values);
             }

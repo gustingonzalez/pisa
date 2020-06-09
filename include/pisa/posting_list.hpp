@@ -4,6 +4,7 @@
 #include "multicompression/stats.hpp"
 #include "util/block_profiler.hpp"
 #include "util/util.hpp"
+#include "greedy_partition.hpp"
 
 namespace pisa {
 /**
@@ -68,7 +69,6 @@ static decoder decoders[] {
 
 template <bool Profile = false>
 struct posting_list {
-    static const uint64_t block_size = 128;
     template <typename DocsIterator, typename FreqsIterator>
     // Returns <used doc codecs, used freq codecs>
     auto static write(std::vector<uint8_t> &out,
@@ -80,7 +80,10 @@ struct posting_list {
         TightVariableByte::encode_single(n, out);
 
         // uint64_t block_size = BlockCodec::block_size;
-        uint64_t blocks = ceil_div(n, block_size);
+        vector<uint32_t> partitions = pisa::GreedyPartition::compute(docs_begin, n);
+        uint64_t blocks = partitions.size();
+        TightVariableByte::encode_single(blocks, out);
+        
         size_t begin_block_maxs = out.size();
         size_t begin_block_endpoints = begin_block_maxs + 4 * blocks;
         size_t begin_blocks = begin_block_endpoints + 4 * (blocks - 1);
@@ -88,8 +91,6 @@ struct posting_list {
 
         DocsIterator docs_it(docs_begin);
         FreqsIterator freqs_it(freqs_begin);
-        std::vector<uint32_t> docs_buf(block_size);
-        std::vector<uint32_t> freqs_buf(block_size);
         uint32_t last_doc(-1);
         uint32_t block_base = 0;
 
@@ -98,7 +99,9 @@ struct posting_list {
 
         // Foreach block...
         for (size_t b = 0; b < blocks; ++b) {
-            uint32_t cur_block_size = ((b + 1) * block_size <= n) ? block_size : (n % block_size);
+            uint32_t cur_block_size = partitions[b];
+            std::vector<uint32_t> docs_buf(cur_block_size);
+            std::vector<uint32_t> freqs_buf(cur_block_size);
 
             // Foreach cell of b-th block...
             for (size_t i = 0; i < cur_block_size; ++i) {
@@ -193,9 +196,9 @@ struct posting_list {
                 out.insert(out.end(), buf.data(), buf.data() + buf.size());
                 return {single_vbyte, buf.size()};
             }
-        } else if (all_ones_block::is_encodable(in, sum_of_values, n)) {
+        }/* else if (all_ones_block::is_encodable(in, sum_of_values, n)) {
             return {block_all_ones, 0};
-        }
+        }*/
 
         // Encodeds of 'in'.
         std::vector<std::vector<uint8_t>> encoded(11);
@@ -203,7 +206,7 @@ struct posting_list {
         // Starts encodes sizes in the max possible value.
         std::vector<size_t> sizes(11, SIZE_MAX);
 
-        if(many_ones_block::encode(in, sum_of_values, n, encoded[block_many_ones])) {
+        /*if(many_ones_block::encode(in, sum_of_values, n, encoded[block_many_ones])) {
            sizes[block_many_ones] = encoded[block_many_ones].size(); 
         }
 
@@ -219,23 +222,23 @@ struct posting_list {
             optpfor_block::encode(in, sum_of_values, n, encoded[block_optpfor]);
             sizes[block_simdbp] = encoded[block_simdbp].size();
             sizes[block_optpfor] = encoded[block_optpfor].size();
-        }
+        }*/
 
         // Encoders that don't need a special number of integers.
         interpolative_block::encode(in, sum_of_values, n, encoded[block_interpolative]);
-        streamvbyte_block::encode(in, sum_of_values, n, encoded[block_streamvbyte]);
+        /*streamvbyte_block::encode(in, sum_of_values, n, encoded[block_streamvbyte]);
         maskedvbyte_block::encode(in, sum_of_values, n, encoded[block_maskedvbyte]);
         simple8b_block::encode(in, sum_of_values, n, encoded[block_simple8b]);
         simple16_block::encode(in, sum_of_values, n, encoded[block_simple16]);
         varintgb_block::encode(in, sum_of_values, n, encoded[block_varintgb]);
-        qmx_block::encode(in, sum_of_values, n, encoded[block_qmx]);
+        qmx_block::encode(in, sum_of_values, n, encoded[block_qmx]);*/
         sizes[block_interpolative] = encoded[block_interpolative].size();
-        sizes[block_streamvbyte] = encoded[block_streamvbyte].size();
+        /*sizes[block_streamvbyte] = encoded[block_streamvbyte].size();
         sizes[block_maskedvbyte] = encoded[block_maskedvbyte].size();
         sizes[block_simple8b] = encoded[block_simple8b].size();
         sizes[block_simple16] = encoded[block_simple16].size();
         sizes[block_varintgb] = encoded[block_varintgb].size();
-        sizes[block_qmx] = encoded[block_qmx].size();
+        sizes[block_qmx] = encoded[block_qmx].size();*/
 
         // Selects the encoder that generates the minimum number of bytes.
         uint8_t codec = std::min_element(sizes.begin(), sizes.end()) - sizes.begin();
@@ -249,21 +252,19 @@ struct posting_list {
         document_enumerator(uint8_t const *data,
                             uint64_t universe,
                             size_t term_id = 0)
-            : m_n(0) // just to silence warnings
-              ,
-              m_base(TightVariableByte::decode(data, &m_n, 1)),
-              m_blocks(ceil_div(m_n, block_size)),
-              m_block_maxs(m_base),
-              m_block_endpoints(m_block_maxs + 4 * m_blocks),
-              m_blocks_data(m_block_endpoints + 4 * (m_blocks - 1)),
-              m_universe(universe)
         {
+            m_base = TightVariableByte::decode(data, &m_n, 1);
+            m_base = TightVariableByte::decode(m_base, &m_blocks, 1);
+            m_block_maxs = m_base;
+            m_block_endpoints = m_block_maxs + 4 * m_blocks;
+            m_blocks_data = m_block_endpoints + 4 * (m_blocks - 1);
+            m_universe = universe;
             if (Profile) {
                 // std::cout << "OPEN\t" << m_term_id << "\t" << m_blocks << "\n";
                 m_block_profile = block_profiler::open_list(term_id, m_blocks);
             }
-            m_docs_buf.resize(block_size);
-            m_freqs_buf.resize(block_size);
+            m_docs_buf.resize(m_n);
+            m_freqs_buf.resize(m_n);
             reset();
         }
 
@@ -283,7 +284,7 @@ struct posting_list {
             }
         }
 
-        void PISA_ALWAYSINLINE next_geq(uint64_t lower_bound)
+        /*void PISA_ALWAYSINLINE next_geq(uint64_t lower_bound)
         {
             assert(lower_bound >= m_cur_docid || position() == 0);
             if (PISA_UNLIKELY(lower_bound > m_cur_block_max)) {
@@ -305,9 +306,9 @@ struct posting_list {
                 m_cur_docid += m_docs_buf[++m_pos_in_block] + 1;
                 assert(m_pos_in_block < m_cur_block_size);
             }
-        }
+        }*/
 
-        void PISA_ALWAYSINLINE move(uint64_t pos)
+        /*void PISA_ALWAYSINLINE move(uint64_t pos)
         {
             assert(pos >= position());
             uint64_t block = pos / block_size;
@@ -317,7 +318,7 @@ struct posting_list {
             while (position() < pos) {
                 m_cur_docid += m_docs_buf[++m_pos_in_block] + 1;
             }
-        }
+        }*/
 
         uint64_t docid() const { return m_cur_docid; }
 
@@ -329,7 +330,7 @@ struct posting_list {
             return m_freqs_buf[m_pos_in_block] + 1;
         }
 
-        uint64_t position() const { return m_cur_block * block_size + m_pos_in_block; }
+        // uint64_t position() const { return m_cur_block * block_size + m_pos_in_block; }
 
         uint64_t size() const { return m_n; }
 
@@ -341,7 +342,7 @@ struct posting_list {
             uint64_t bytes = 0;
             uint8_t const *ptr = m_blocks_data;
             // static const uint64_t block_size = block_size;
-            std::vector<uint32_t> buf(block_size);
+            std::vector<uint32_t> buf(m_n);
             for (size_t b = 0; b < m_blocks; ++b) {
                 uint32_t cur_block_size;
                 ptr = TightVariableByte::next(ptr, cur_block_size);
