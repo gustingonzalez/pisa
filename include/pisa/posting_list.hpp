@@ -229,6 +229,12 @@ struct posting_list {
             sizes[block_optpfor] = encoded[block_optpfor].size();
         }
 
+        // QMX codec fails with larger blocks.
+        if (n <= 512) {
+            qmx_block::encode(in, sum_of_values, n, encoded[block_qmx]);
+            sizes[block_qmx] = encoded[block_qmx].size();
+        }
+
         // Encoders that don't need a special number of integers.
         interpolative_block::encode(in, sum_of_values, n, encoded[block_interpolative]);
         streamvbyte_block::encode(in, sum_of_values, n, encoded[block_streamvbyte]);
@@ -236,14 +242,12 @@ struct posting_list {
         simple8b_block::encode(in, sum_of_values, n, encoded[block_simple8b]);
         simple16_block::encode(in, sum_of_values, n, encoded[block_simple16]);
         varintgb_block::encode(in, sum_of_values, n, encoded[block_varintgb]);
-        // qmx_block::encode(in, sum_of_values, n, encoded[block_qmx]);
         sizes[block_interpolative] = encoded[block_interpolative].size();
         sizes[block_streamvbyte] = encoded[block_streamvbyte].size();
         sizes[block_maskedvbyte] = encoded[block_maskedvbyte].size();
         sizes[block_simple8b] = encoded[block_simple8b].size();
         sizes[block_simple16] = encoded[block_simple16].size();
         sizes[block_varintgb] = encoded[block_varintgb].size();
-        // sizes[block_qmx] = encoded[block_qmx].size();
 
         // Selects the encoder that generates the minimum number of bytes.
         uint8_t codec = std::min_element(sizes.begin(), sizes.end()) - sizes.begin();
