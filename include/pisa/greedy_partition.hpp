@@ -8,8 +8,10 @@ namespace pisa {
         }
 
         template <typename Iterator>
-        static std::vector<uint32_t> compute(Iterator list, uint32_t n, uint32_t step) {
+        static auto compute(Iterator list, uint32_t n, int step) ->
+        std::pair<std::vector<uint32_t>, std::vector<size_t>> {
             std::vector<uint32_t> partitions;
+            std::vector<size_t> weights;
             uint32_t last_computed(-1);
             uint32_t list_size = 0;
 
@@ -40,6 +42,7 @@ namespace pisa {
                 if (weight_candidate > weight) {
                     // Appends block size to partitions.
                     partitions.push_back(block_size);
+                    weights.push_back(weight);
 
                     // Reinitializes a new window.
                     start = end + 1;
@@ -53,12 +56,13 @@ namespace pisa {
                 // Break condition.
                 if (end_candidate == end && end == n - 1) {
                     partitions.push_back(block_size);
+                    weights.push_back(weight);
                     break;
                 }
 
-            } while(true);
+            } while (true);
 
-            return partitions;
+            return {partitions, weights};
         }
     };
 }
