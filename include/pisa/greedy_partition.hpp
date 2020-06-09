@@ -4,7 +4,7 @@ namespace pisa {
     struct GreedyPartition {
 
         static size_t compute_weight(uint32_t end, uint32_t block_size) {
-            return end / block_size;
+            return ceil(log2(end / block_size));
         }
 
         template <typename Iterator>
