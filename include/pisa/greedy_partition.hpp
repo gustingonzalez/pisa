@@ -8,11 +8,10 @@ namespace pisa {
         }
 
         template <typename Iterator>
-        static std::vector<uint32_t> compute(Iterator list, uint32_t n) {
+        static std::vector<uint32_t> compute(Iterator list, uint32_t n, uint32_t step) {
             std::vector<uint32_t> partitions;
             uint32_t last_computed(-1);
             uint32_t list_size = 0;
-            int step = 8;
 
             // start-end window
             uint32_t start = 0;

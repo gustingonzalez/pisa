@@ -80,7 +80,7 @@ struct posting_list {
         TightVariableByte::encode_single(n, out);
 
         // uint64_t block_size = BlockCodec::block_size;
-        vector<uint32_t> partitions = pisa::GreedyPartition::compute(docs_begin, n);
+        vector<uint32_t> partitions = pisa::GreedyPartition::compute(docs_begin, n, 32);
         uint64_t blocks = partitions.size();
         if (n > 1) {
             TightVariableByte::encode_single(blocks, out);
