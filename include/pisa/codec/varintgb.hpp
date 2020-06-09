@@ -243,8 +243,8 @@ struct varintgb_block {
                        size_t                n,
                        std::vector<uint8_t> &out) {
         thread_local VarIntGB<false> varintgb_codec;
-        assert(n <= block_size);
-        thread_local std::vector<uint8_t> buf(2 * block_size * sizeof(uint32_t));
+        // assert(n <= block_size);
+        std::vector<uint8_t> buf(2 * n * sizeof(uint32_t));
         size_t                            out_len = varintgb_codec.encodeArray(in, n, buf.data());
         out.insert(out.end(), buf.data(), buf.data() + out_len);
     }
@@ -254,7 +254,7 @@ struct varintgb_block {
                                  uint32_t       sum_of_values,
                                  size_t         n) {
         thread_local VarIntGB<false> varintgb_codec;
-        assert(n <= block_size);
+        // assert(n <= block_size);
         auto read = varintgb_codec.decodeArray(in, n, out);
         return read + in;
     }
