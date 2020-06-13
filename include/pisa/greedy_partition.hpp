@@ -3,8 +3,8 @@
 namespace pisa {
     struct GreedyPartition {
 
-        static size_t compute_weight(uint32_t end, uint32_t block_size) {
-            return ceil(log2(end / block_size));
+        static size_t compute_weight(uint32_t begin, uint32_t end, uint32_t block_size) {
+            return ceil(log2((end - begin) / block_size));
         }
 
         template <typename Iterator>
@@ -15,13 +15,14 @@ namespace pisa {
             uint32_t last_computed(-1);
             uint32_t list_size = 0;
 
-            // start-end window
-            uint32_t start = 0;
+            // begin-end window
+            uint32_t begin = 0;
             uint32_t end = step < n ? step - 1 : n - 1;
-            uint32_t block_size = end - start + 1;
-            size_t weight = compute_weight(list[end], block_size);
+            uint32_t block_size = end - begin + 1;
+            uint32_t begin_element = list[0];
+            size_t weight = compute_weight(begin_element, list[end], block_size);
             bool increment_window = false;
-
+            
             uint32_t end_candidate;
             uint32_t block_size_cantidate;
             size_t weight_candidate;
@@ -35,8 +36,8 @@ namespace pisa {
                 }
 
                 end_candidate = (end + step) < n ? (end + step) : n - 1;
-                block_size_cantidate = (end_candidate - start) + 1;
-                weight_candidate = compute_weight(list[end_candidate], block_size_cantidate);
+                block_size_cantidate = (end_candidate - begin) + 1;
+                weight_candidate = compute_weight(begin_element, list[end_candidate], block_size_cantidate);
 
                 // If the previously computed weight is lesser than the new candidate...
                 if (weight_candidate > weight) {
@@ -45,10 +46,11 @@ namespace pisa {
                     weights.push_back(weight);
 
                     // Reinitializes a new window.
-                    start = end + 1;
-                    end = start + step < n ? start + (step - 1) : n - 1;
-                    block_size = (end - start) + 1;
-                    weight = compute_weight(list[end], block_size);
+                    begin = end + 1;
+                    end = begin + step < n ? begin + (step - 1) : n - 1;
+                    block_size = (end - begin) + 1;
+                    begin_element = list[begin - 1];
+                    weight = compute_weight(begin_element, list[end], block_size);
                 } else {
                     increment_window = true;
                 }
