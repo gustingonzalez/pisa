@@ -6,6 +6,11 @@
 #include "util/util.hpp"
 #include "greedy_partition.hpp"
 
+#include <stdexcept>
+#include "configuration.hpp"
+#include "global_parameters.hpp"
+#include "optimal_partition.hpp"
+
 namespace pisa {
 /**
  * Codec types where each codec number (starting from zero) matches
@@ -69,6 +74,40 @@ static decoder decoders[] {
 
 template <bool Profile = false>
 struct posting_list {
+    template <typename Iterator>
+    auto static compute_partitions(Iterator begin,
+                                   uint64_t n) {
+        auto const& conf = configuration::get();
+
+        // Cost of saving 'begin_block_endpoints' and 'begin_blocks'.
+        const size_t fix_header_cost = 32 * 2;
+
+        // Note: internally 'optimal_partition' computes 'universe - begin'.
+        auto cost_fun = [&](uint32_t universe, uint64_t block_size) {
+            // Cost of 'represent' each element.
+            const size_t payload_cost = ceil(log2(universe / block_size)) * block_size;
+
+            // 'Wasted' bits of the last byte of payload.
+            const size_t payload_wasted = payload_cost % 8;
+
+            // Total cost.
+            return fix_header_cost + payload_cost + payload_wasted;
+        };
+        // Gets last element of the posting list.
+        uint32_t universe = *std::next(begin, n - 1);
+
+        // Computes 'optimal' partitioning based on cost.
+        optimal_partition opt(begin, *begin, universe, n, cost_fun, conf.eps1, conf.eps2);
+        
+        // Computes the size of each partition.
+        std::vector<uint32_t> partitions(opt.partition.size());
+        partitions[0] = opt.partition[0];
+        for(size_t i = 1; i < opt.partition.size(); i++) {
+            partitions[i] = opt.partition[i] - opt.partition[i - 1];
+        }
+        return partitions;
+    }
+
     template <typename DocsIterator, typename FreqsIterator>
     // Returns <used doc codecs, used freq codecs>
     auto static write(std::vector<uint8_t> &out,
@@ -81,8 +120,9 @@ struct posting_list {
         TightVariableByte::encode_single(n, out);
 
         // uint64_t block_size = BlockCodec::block_size;
-        vector<uint32_t> partitions = pisa::GreedyPartition::compute(docs_begin, n, 32).first;
+        vector<uint32_t> partitions = compute_partitions<DocsIterator>(docs_begin, n);
         uint64_t blocks = partitions.size();
+
         if (n > 1) {
             TightVariableByte::encode_single(blocks, out);
         }
