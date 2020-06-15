@@ -103,7 +103,7 @@ struct posting_list {
             const size_t codec_header_cost = block_size == 1 ? 0 : 8;
 
             // Cost of 'represent' each element.
-            const size_t payload_cost = ceil(log2(universe / block_size)) * block_size;
+            const size_t payload_cost = ceil(log2(universe / (float)block_size)) * block_size;
 
             // 'Wasted' bits of the last byte of payload.
             const size_t payload_wasted = payload_cost % 8;
