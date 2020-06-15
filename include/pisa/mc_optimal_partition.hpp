@@ -71,14 +71,14 @@ struct McOptimalPartition {
 
         // Cost of saving the entire block. Note: when single block is
         // used, there is not required to save the block count.
-        cost_t single_block_cost = cost_fun(universe - base, size) - block_count_min_cost;
+        cost_t single_block_cost = cost_fun(universe - base, size, false) - block_count_min_cost;
 
         std::vector<cost_t> min_cost(size + 1, single_block_cost);
         min_cost[0] = 0;
 
         // Creates the required window: one for each power of approx_factor.
         std::vector<cost_window<ForwardIterator>> windows;
-        cost_t cost_lb = cost_fun(1, 1); // Minimum cost
+        cost_t cost_lb = cost_fun(1, 1, true); // Minimum cost
         cost_t cost_bound = cost_lb;
         while (eps1 == 0 || cost_bound < cost_lb / eps1) {
             windows.emplace_back(begin, base, cost_bound);
@@ -99,7 +99,7 @@ struct McOptimalPartition {
 
                 cost_t window_cost;
                 while (true) {
-                    window_cost = cost_fun(window.universe(), window.size());
+                    window_cost = cost_fun(window.universe(), window.size(), true);
                     if ((min_cost[i] + window_cost < min_cost[window.end])) {
                         min_cost[window.end] = min_cost[i] + window_cost;
                         path[window.end] = i;

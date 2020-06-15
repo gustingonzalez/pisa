@@ -75,18 +75,32 @@ static decoder decoders[] {
 template <bool Profile = false>
 struct posting_list {
     template <typename Iterator>
-    auto static compute_partitions(Iterator begin,
-                                   uint64_t n) {
+    auto static compute_partitions(Iterator begin, uint64_t n) {
         auto const& conf = configuration::get();
 
         // Cost of saving 'begin_block_endpoints' and 'begin_blocks'.
         const size_t fix_header_cost = 32 * 2;
+        
+        // Computes required bits to represent a number by using varint.
+        auto varint_size = [](uint32_t n) {
+            size_t required_bits = n > 0 ? log2(n) + 1 : 1;
+
+            // Varint requires one extra bit for each byte (note: it's
+            // used '8.0' to get a 'float' result).
+            required_bits += ceil(required_bits / 8.0);
+            
+            // Bits wasted to complete a 'full' byte.
+            size_t remainder = required_bits % 8;
+            required_bits += remainder ? 8 - remainder : 0;
+
+            return required_bits;
+        };
 
         // Note: internally 'optimal_partition' computes 'universe - begin'.
-        auto cost_fun = [&](uint32_t universe, uint64_t block_size) {
+        auto cost_fun = [&](uint32_t universe, uint64_t block_size, bool is_partial_block) {
             // Cost of saving the used codecs (when the size of the posting
             // list is 1, this cost is zero).
-            const size_t codec_header_cost = block_size == 1 ? 0 : 8; 
+            const size_t codec_header_cost = block_size == 1 ? 0 : 8;
 
             // Cost of 'represent' each element.
             const size_t payload_cost = ceil(log2(universe / block_size)) * block_size;
@@ -95,7 +109,13 @@ struct posting_list {
             const size_t payload_wasted = payload_cost % 8;
 
             // Total header cost.
-            const size_t header_cost = fix_header_cost + codec_header_cost;
+            size_t header_cost = fix_header_cost + codec_header_cost;
+            
+            // Cost of saving the block size by using varint. Consider that
+            // this one is saved only when there are more than one block,
+            // i.e. when the current block is not 'the full block'. Note
+            // that 'block size' is actually saved as 'block_size - 1'.
+            header_cost += (is_partial_block ? varint_size(block_size - 1) : 0);
 
             // Total cost.
             return header_cost + payload_cost + payload_wasted;
@@ -103,7 +123,7 @@ struct posting_list {
         // Gets last element of the posting list.
         uint32_t universe = *std::next(begin, n - 1);
 
-        // Computes 'optimal' partitioning based on cost.
+        // Computes 'optimal' partitioning based on cost function.
         McOptimalPartition opt(begin, *begin, universe, n, cost_fun, conf.eps1, conf.eps2);
         
         // Computes the size of each partition.
