@@ -84,14 +84,21 @@ struct posting_list {
 
         // Note: internally 'optimal_partition' computes 'universe - begin'.
         auto cost_fun = [&](uint32_t universe, uint64_t block_size) {
+            // Cost of saving the used codecs (when the size of the posting
+            // list is 1, this cost is zero).
+            const size_t codec_header_cost = block_size == 1 ? 0 : 8; 
+
             // Cost of 'represent' each element.
             const size_t payload_cost = ceil(log2(universe / block_size)) * block_size;
 
             // 'Wasted' bits of the last byte of payload.
             const size_t payload_wasted = payload_cost % 8;
 
+            // Total header cost.
+            const size_t header_cost = fix_header_cost + codec_header_cost;
+
             // Total cost.
-            return fix_header_cost + payload_cost + payload_wasted;
+            return header_cost + payload_cost + payload_wasted;
         };
         // Gets last element of the posting list.
         uint32_t universe = *std::next(begin, n - 1);
