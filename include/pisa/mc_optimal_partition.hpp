@@ -65,7 +65,14 @@ struct McOptimalPartition {
                        double eps1,
                        double eps2)
     {
-        cost_t single_block_cost = cost_fun(universe - base, size);
+        // Due to the block count is saved by using varint, the cost is
+        // variable. However the minimum cost is 1 byte (8 bits).
+        cost_t block_count_min_cost = 8;
+
+        // Cost of saving the entire block. Note: when single block is
+        // used, there is not required to save the block count.
+        cost_t single_block_cost = cost_fun(universe - base, size) - block_count_min_cost;
+
         std::vector<cost_t> min_cost(size + 1, single_block_cost);
         min_cost[0] = 0;
 
