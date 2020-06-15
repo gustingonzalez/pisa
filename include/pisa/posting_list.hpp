@@ -9,7 +9,7 @@
 #include <stdexcept>
 #include "configuration.hpp"
 #include "global_parameters.hpp"
-#include "optimal_partition.hpp"
+#include "mc_optimal_partition.hpp"
 
 namespace pisa {
 /**
@@ -104,7 +104,7 @@ struct posting_list {
         uint32_t universe = *std::next(begin, n - 1);
 
         // Computes 'optimal' partitioning based on cost.
-        optimal_partition opt(begin, *begin, universe, n, cost_fun, conf.eps1, conf.eps2);
+        McOptimalPartition opt(begin, *begin, universe, n, cost_fun, conf.eps1, conf.eps2);
         
         // Computes the size of each partition.
         std::vector<uint32_t> partitions(opt.partition.size());
