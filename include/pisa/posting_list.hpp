@@ -83,17 +83,7 @@ struct posting_list {
         
         // Computes required bits to represent a number by using varint.
         auto varint_size = [](uint32_t n) {
-            size_t required_bits = n > 0 ? log2(n) + 1 : 1;
-
-            // Varint requires one extra bit for each byte (note: it's
-            // used '8.0' to get a 'float' result).
-            required_bits += ceil(required_bits / 8.0);
-            
-            // Bits wasted to complete a 'full' byte.
-            size_t remainder = required_bits % 8;
-            required_bits += remainder ? 8 - remainder : 0;
-
-            return required_bits;
+            return ceil(ceil_log2(n + 1) / 7.0) * 8;
         };
 
         // Note: internally 'optimal_partition' computes 'universe - begin'.
