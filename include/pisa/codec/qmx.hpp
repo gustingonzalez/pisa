@@ -5,7 +5,7 @@
 
 namespace pisa {
 struct qmx_block {
-    static const uint64_t block_size = 128;
+    static const uint64_t block_size = 64;
     static const uint64_t overflow = 512;
 
     static void encode(uint32_t const *in,

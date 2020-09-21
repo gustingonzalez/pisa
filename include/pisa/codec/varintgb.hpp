@@ -236,7 +236,7 @@ template <bool delta>
 uint32_t VarIntGB<delta>::mask[4] = {0xFF, 0xFFFF, 0xFFFFFF, 0xFFFFFFFF};
 
 struct varintgb_block {
-    static const uint64_t block_size = 128;
+    static const uint64_t block_size = 64;
 
     static void encode(uint32_t const *      in,
                        uint32_t              sum_of_values,

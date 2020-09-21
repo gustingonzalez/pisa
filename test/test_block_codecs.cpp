@@ -54,7 +54,7 @@ TEST_CASE("block_codecs")
         {2, 16, pisa::varint_G8IU_block::block_size - 1, pisa::varint_G8IU_block::block_size});
 
     // SIMDBP and PFD implementations works with chunks equals to block size.
-    test_block_codec<pisa::simdbp_block>({pisa::simdbp_block::block_size});
+    // test_block_codec<pisa::simdbp_block>({pisa::simdbp_block::block_size});
     test_block_codec<pisa::optpfor_block>({pisa::optpfor_block::block_size});
 
     // The minimum list size required for varintG8IU implementation is 8.

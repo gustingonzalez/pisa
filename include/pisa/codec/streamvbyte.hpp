@@ -8,7 +8,7 @@
 namespace pisa {
 
 struct streamvbyte_block {
-    static const uint64_t block_size = 128;
+    static const uint64_t block_size = 64;
     static void encode(uint32_t const *in,
                        uint32_t /* sum_of_values */,
                        size_t n,

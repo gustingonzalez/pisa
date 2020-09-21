@@ -137,7 +137,7 @@ namespace pisa {
     };
 
     struct interpolative_block {
-        static const uint64_t block_size = 128;
+        static const uint64_t block_size = 64;
 
         static void encode(uint32_t const* in, uint32_t sum_of_values,
                            size_t n, std::vector<uint8_t>& out)
@@ -187,7 +187,7 @@ namespace pisa {
 
     struct optpfor_block {
 
-        struct codec_type : FastPForLib::OPTPFor<4, FastPForLib::Simple16<false>> {
+        struct codec_type : FastPForLib::OPTPFor<2, FastPForLib::Simple16<false>> {
 
             uint8_t const* force_b;
 
@@ -254,7 +254,7 @@ namespace pisa {
     };
 
     struct varint_G8IU_block {
-        static const uint64_t block_size = 128;
+        static const uint64_t block_size = 64;
 
         struct codec_type : VarIntG8IU {
 
@@ -336,7 +336,7 @@ namespace pisa {
      * since it can be recovered based on the 'sum of values' parameter.
      */
     struct all_ones_block {
-        static const uint64_t block_size = 128;
+        static const uint64_t block_size = 64;
 
         static bool is_encodable(uint32_t const* in, uint32_t sum_of_values, size_t n) {
             bool encoding_freqs = sum_of_values == std::numeric_limits<uint32_t>::max();
@@ -377,7 +377,7 @@ namespace pisa {
      * its gaps) by using Simple16.
      */
     struct many_ones_block {
-        static const uint64_t block_size = 128;
+        static const uint64_t block_size = 64;
         
         // % of admitted exceptions.
         static constexpr float exception_threshold = 0.75f;

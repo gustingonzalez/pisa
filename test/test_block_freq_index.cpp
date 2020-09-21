@@ -77,7 +77,7 @@ void test_block_freq_index(bool adjust_to_block_size = false)
 
 TEST_CASE("block_freq_index")
 {
-    test_block_freq_index<pisa::varint_G8IU_block>();
+    test_block_freq_index<pisa::varint_G8IU_block>(pisa::optpfor_block::block_size);
     test_block_freq_index<pisa::streamvbyte_block>();
     test_block_freq_index<pisa::maskedvbyte_block>();
     test_block_freq_index<pisa::varintgb_block>();
@@ -87,6 +87,6 @@ TEST_CASE("block_freq_index")
     test_block_freq_index<pisa::simple16_block>();
 
     // SIMDBP and PFD implementations works with chunks equals to block size.
-    test_block_freq_index<pisa::simdbp_block>(pisa::simdbp_block::block_size);
-    test_block_freq_index<pisa::optpfor_block>(pisa::simdbp_block::block_size);
+    // test_block_freq_index<pisa::simdbp_block>(pisa::simdbp_block::block_size);
+    test_block_freq_index<pisa::optpfor_block>(pisa::optpfor_block::block_size);
 }

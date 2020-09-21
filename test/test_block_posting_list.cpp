@@ -116,7 +116,7 @@ void test_block_posting_list_reordering(bool adjust_to_block_size = false)
 
 TEST_CASE("block_posting_list")
 {
-    test_block_posting_list<pisa::varint_G8IU_block>();
+    test_block_posting_list<pisa::varint_G8IU_block>(true);
     test_block_posting_list<pisa::streamvbyte_block>();
     test_block_posting_list<pisa::maskedvbyte_block>();
     test_block_posting_list<pisa::varintgb_block>();
@@ -126,7 +126,7 @@ TEST_CASE("block_posting_list")
     test_block_posting_list<pisa::simple16_block>();
 
     // SIMDBP and PFD implementations works with chunks equals to block size.
-    test_block_posting_list<pisa::simdbp_block>(true);
+    // test_block_posting_list<pisa::simdbp_block>(true);
     test_block_posting_list<pisa::optpfor_block>(true);
 }
 TEST_CASE("block_posting_list_reordering")
