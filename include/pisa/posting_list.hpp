@@ -11,7 +11,7 @@ namespace pisa {
 /**
  * Decodes next integer. This method is optimal when an unique integer
  * must be decoded (note: SIMD isn't used here).
-*/
+ */
 inline uint8_t const* read_next_vbyte(uint8_t const* in, uint32_t& val) {
     // Gets the first byte avoiding the continuation bit.
     uint32_t c = *in++;
@@ -58,8 +58,8 @@ enum CodecTypes {
     single_vbyte,
 };
 
-typedef uint8_t const *(*decoder)(uint8_t const *, uint32_t *, uint32_t, size_t);
-static decoder decoders[] {
+typedef uint8_t const* (*decoder)(uint8_t const*, uint32_t*, uint32_t, size_t);
+static decoder decoders[]{
     simdbp_block::decode,
     varint_G8IU_block::decode,
     varintgb_block::decode,
@@ -74,13 +74,11 @@ static decoder decoders[] {
     all_ones_block::decode,
     // Note that 'dummy parameters' are used (i.e. 'size_t') to allow generic
     // calls when decoding, such as: decoders[11].decode(in, out, s, n)
-    [](uint8_t const *in, uint32_t *out, uint32_t sum_of_values, size_t) {
+    [](uint8_t const* in, uint32_t* out, uint32_t sum_of_values, size_t) {
         out[0] = sum_of_values;
         return in;
     },
-    [](uint8_t const* in, uint32_t* out, uint32_t, size_t) {
-        return read_next_vbyte(in, out[0]);
-    },
+    [](uint8_t const* in, uint32_t* out, uint32_t, size_t) { return read_next_vbyte(in, out[0]); },
 };
 
 template <bool Profile = false>
@@ -88,12 +86,9 @@ struct posting_list {
     static const uint64_t block_size = 128;
     template <typename DocsIterator, typename FreqsIterator>
     // Returns <used doc codecs, used freq codecs>
-    auto static write(std::vector<uint8_t> &out,
-                      uint32_t n,
-                      DocsIterator docs_begin,
-                      FreqsIterator freqs_begin)
-        -> std::pair<std::vector<pisa::ChunkStatistic>, std::vector<pisa::ChunkStatistic>>
-    {
+    auto static write(
+        std::vector<uint8_t>& out, uint32_t n, DocsIterator docs_begin, FreqsIterator freqs_begin
+    ) -> std::pair<std::vector<pisa::ChunkStatistic>, std::vector<pisa::ChunkStatistic>> {
         TightVariableByte::encode_single(n, out);
 
         // uint64_t block_size = BlockCodec::block_size;
@@ -125,7 +120,7 @@ struct posting_list {
 
                 freqs_buf[i] = *freqs_it++ - 1;
             }
-            *((uint32_t *)&out[begin_block_maxs + 4 * b]) = last_doc;
+            *((uint32_t*)&out[begin_block_maxs + 4 * b]) = last_doc;
 
             // Reserves space for codecs if n > 1.
             size_t codecs_index = 0;
@@ -135,11 +130,17 @@ struct posting_list {
             }
 
             auto doc_codec = encode(
-                docs_buf.data(), last_doc - block_base - (cur_block_size - 1), cur_block_size, out);
-            auto freq_codec = encode(freqs_buf.data(), std::numeric_limits<uint32_t>::max(), cur_block_size, out);
+                docs_buf.data(), last_doc - block_base - (cur_block_size - 1), cur_block_size, out
+            );
+            auto freq_codec =
+                encode(freqs_buf.data(), std::numeric_limits<uint32_t>::max(), cur_block_size, out);
 
-            pisa::ChunkStatistic dcs(docs_buf, cur_block_size, doc_codec.first, doc_codec.second, false);
-            pisa::ChunkStatistic fcs(freqs_buf, cur_block_size, freq_codec.first, freq_codec.second, true);
+            pisa::ChunkStatistic dcs(
+                docs_buf, cur_block_size, doc_codec.first, doc_codec.second, false
+            );
+            pisa::ChunkStatistic fcs(
+                freqs_buf, cur_block_size, freq_codec.first, freq_codec.second, true
+            );
 
             // Saves codecs.
             if (cur_block_size > 1) {
@@ -150,7 +151,7 @@ struct posting_list {
             fcstats.push_back(fcs);
 
             if (b != blocks - 1) {
-                *((uint32_t *)&out[begin_block_endpoints + 4 * b]) = out.size() - begin_blocks;
+                *((uint32_t*)&out[begin_block_endpoints + 4 * b]) = out.size() - begin_blocks;
             }
             block_base = last_doc + 1;
         }
@@ -158,12 +159,10 @@ struct posting_list {
     }
 
     template <typename BlockDataRange>
-    static void write_blocks(std::vector<uint8_t> &out,
-                             uint32_t n,
-                             BlockDataRange const &input_blocks)
-    {
+    static void
+    write_blocks(std::vector<uint8_t>& out, uint32_t n, BlockDataRange const& input_blocks) {
         TightVariableByte::encode_single(n, out);
-        assert(input_blocks.front().index == 0); // first block must remain first
+        assert(input_blocks.front().index == 0);  // first block must remain first
 
         uint64_t blocks = input_blocks.size();
         size_t begin_block_maxs = out.size();
@@ -171,16 +170,15 @@ struct posting_list {
         size_t begin_blocks = begin_block_endpoints + 4 * (blocks - 1);
         out.resize(begin_blocks);
 
-        for (auto const &block : input_blocks) {
+        for (auto const& block: input_blocks) {
             size_t b = block.index;
             // write endpoint
             if (b != 0) {
-                *((uint32_t *)&out[begin_block_endpoints + 4 * (b - 1)]) =
-                    out.size() - begin_blocks;
+                *((uint32_t*)&out[begin_block_endpoints + 4 * (b - 1)]) = out.size() - begin_blocks;
             }
 
             // write max
-            *((uint32_t *)&out[begin_block_maxs + 4 * b]) = block.max;
+            *((uint32_t*)&out[begin_block_maxs + 4 * b]) = block.max;
 
             // copy block
             block.append_docs_block(out);
@@ -188,13 +186,10 @@ struct posting_list {
         }
     }
 
-    static auto encode(uint32_t const *in,
-                       uint32_t sum_of_values,
-                       size_t n,
-                       std::vector<uint8_t> &out) -> std::pair<uint8_t, size_t>
-    {
+    static auto encode(uint32_t const* in, uint32_t sum_of_values, size_t n, std::vector<uint8_t>& out)
+        -> std::pair<uint8_t, size_t> {
         bool docs_encoding = sum_of_values != std::numeric_limits<uint32_t>::max();
-        
+
         // If 'n' is equal to 1...
         if (n == 1) {
             // If this one integer is a doc...
@@ -217,8 +212,8 @@ struct posting_list {
         // Starts encodes sizes in the max possible value.
         std::vector<size_t> sizes(11, SIZE_MAX);
 
-        if(many_ones_block::encode(in, sum_of_values, n, encoded[block_many_ones])) {
-           sizes[block_many_ones] = encoded[block_many_ones].size(); 
+        if (many_ones_block::encode(in, sum_of_values, n, encoded[block_many_ones])) {
+            sizes[block_many_ones] = encoded[block_many_ones].size();
         }
 
         // Encodes according the minimum integers required for varint.
@@ -259,19 +254,20 @@ struct posting_list {
     }
 
     class document_enumerator {
-       public:
-        document_enumerator(uint8_t const *data,
-                            uint64_t universe,
-                            size_t term_id = 0)
-            : m_n(0) // just to silence warnings
+      public:
+        document_enumerator(
+            uint8_t const* data,
+            uint64_t universe,
+            size_t term_id = 0
+        )
+            : m_n(0)  // just to silence warnings
               ,
               m_base(TightVariableByte::decode(data, &m_n, 1)),
               m_blocks(ceil_div(m_n, block_size)),
               m_block_maxs(m_base),
               m_block_endpoints(m_block_maxs + 4 * m_blocks),
               m_blocks_data(m_block_endpoints + 4 * (m_blocks - 1)),
-              m_universe(universe)
-        {
+              m_universe(universe) {
             if (Profile) {
                 // std::cout << "OPEN\t" << m_term_id << "\t" << m_blocks << "\n";
                 m_block_profile = block_profiler::open_list(term_id, m_blocks);
@@ -283,8 +279,7 @@ struct posting_list {
 
         void reset() { decode_docs_block(0); }
 
-        void PISA_ALWAYSINLINE next()
-        {
+        void PISA_ALWAYSINLINE next() {
             ++m_pos_in_block;
             if (m_pos_in_block == m_cur_block_size) [[unlikely]] {
                 if (m_cur_block + 1 == m_blocks) {
@@ -297,10 +292,9 @@ struct posting_list {
             }
         }
 
-        void PISA_ALWAYSINLINE next_geq(uint64_t lower_bound)
-        {
+        void PISA_ALWAYSINLINE next_geq(uint64_t lower_bound) {
             assert(lower_bound >= m_cur_docid || position() == 0);
-        if (lower_bound > m_cur_block_max) [[unlikely]] {
+            if (lower_bound > m_cur_block_max) [[unlikely]] {
                 // binary search seems to perform worse here
                 if (lower_bound > block_max(m_blocks - 1)) {
                     m_cur_docid = m_universe;
@@ -321,11 +315,10 @@ struct posting_list {
             }
         }
 
-        void PISA_ALWAYSINLINE move(uint64_t pos)
-        {
+        void PISA_ALWAYSINLINE move(uint64_t pos) {
             assert(pos >= position());
             uint64_t block = pos / block_size;
-        if (block != m_cur_block) [[unlikely]] {
+            if (block != m_cur_block) [[unlikely]] {
                 decode_docs_block(block);
             }
             while (position() < pos) {
@@ -335,8 +328,7 @@ struct posting_list {
 
         uint64_t docid() const { return m_cur_docid; }
 
-        uint64_t PISA_ALWAYSINLINE freq()
-        {
+        uint64_t PISA_ALWAYSINLINE freq() {
             if (!m_freqs_decoded) {
                 decode_freqs_block();
             }
@@ -349,11 +341,10 @@ struct posting_list {
 
         uint64_t num_blocks() const { return m_blocks; }
 
-        uint64_t stats_freqs_size()
-        {
+        uint64_t stats_freqs_size() {
             // XXX rewrite in terms of get_blocks()
             uint64_t bytes = 0;
-            uint8_t const *ptr = m_blocks_data;
+            uint8_t const* ptr = m_blocks_data;
             // static const uint64_t block_size = block_size;
             std::vector<uint32_t> buf(block_size);
             for (size_t b = 0; b < m_blocks; ++b) {
@@ -362,12 +353,12 @@ struct posting_list {
 
                 uint32_t cur_base = (b ? block_max(b - 1) : std::numeric_limits<uint32_t>::max()) + 1;
                 unpack_codecs(cur_block_size, ptr);
-                uint8_t const *freq_ptr =
-                    decoders[cur_doc_codec](ptr,
-                                            buf.data(),
-                                            block_max(b) - cur_base - (cur_block_size - 1),
-                                            cur_block_size);
-                ptr = decoders[cur_freq_codec](freq_ptr, buf.data(), std::numeric_limits<uint32_t>::max(), cur_block_size);
+                uint8_t const* freq_ptr = decoders[cur_doc_codec](
+                    ptr, buf.data(), block_max(b) - cur_base - (cur_block_size - 1), cur_block_size
+                );
+                ptr = decoders[cur_freq_codec](
+                    freq_ptr, buf.data(), std::numeric_limits<uint32_t>::max(), cur_block_size
+                );
                 bytes += ptr - freq_ptr;
             }
 
@@ -380,39 +371,36 @@ struct posting_list {
             uint32_t size;
             uint32_t doc_gaps_universe;
 
-            void append_docs_block(std::vector<uint8_t> &out) const
-            {
+            void append_docs_block(std::vector<uint8_t>& out) const {
                 out.insert(out.end(), docs_begin, freqs_begin);
             }
 
-            void append_freqs_block(std::vector<uint8_t> &out) const
-            {
+            void append_freqs_block(std::vector<uint8_t>& out) const {
                 out.insert(out.end(), freqs_begin, end);
             }
 
-            void decode_doc_gaps(std::vector<uint32_t> &out) const
-            {
+            void decode_doc_gaps(std::vector<uint32_t>& out) const {
                 out.resize(size);
                 decoders[cur_doc_codec](docs_begin, out.data(), doc_gaps_universe, size);
             }
 
-            void decode_freqs(std::vector<uint32_t> &out) const
-            {
+            void decode_freqs(std::vector<uint32_t>& out) const {
                 out.resize(size);
-                decoders[cur_freq_codec](freqs_begin, out.data(), std::numeric_limits<uint32_t>::max(), size);
+                decoders[cur_freq_codec](
+                    freqs_begin, out.data(), std::numeric_limits<uint32_t>::max(), size
+                );
             }
 
-           private:
+          private:
             friend class document_enumerator;
 
-            uint8_t const *docs_begin;
-            uint8_t const *freqs_begin;
-            uint8_t const *end;
+            uint8_t const* docs_begin;
+            uint8_t const* freqs_begin;
+            uint8_t const* end;
         };
 
-       private:
-        void unpack_codecs(size_t n, uint8_t const *&block_data)
-        {
+      private:
+        void unpack_codecs(size_t n, uint8_t const*& block_data) {
             bool block_is_greater_than_one = n > 1;
             auto codecs = *block_data;
             // Reads the codecs only if the current block is greater than 1.
@@ -421,23 +409,24 @@ struct posting_list {
             block_data += block_is_greater_than_one;
         }
 
-        uint32_t block_max(uint32_t block) const { return ((uint32_t const *)m_block_maxs)[block]; }
+        uint32_t block_max(uint32_t block) const { return ((uint32_t const*)m_block_maxs)[block]; }
 
-        void PISA_NOINLINE decode_docs_block(uint64_t block)
-        {
+        void PISA_NOINLINE decode_docs_block(uint64_t block) {
             // static const uint64_t block_size = block_size;
-            uint32_t endpoint = block ? ((uint32_t const *)m_block_endpoints)[block - 1] : 0;
-            uint8_t const *block_data = m_blocks_data + endpoint;
+            uint32_t endpoint = block ? ((uint32_t const*)m_block_endpoints)[block - 1] : 0;
+            uint8_t const* block_data = m_blocks_data + endpoint;
             m_cur_block_size =
                 ((block + 1) * block_size <= size()) ? block_size : (size() % block_size);
-            uint32_t cur_base = (block ? block_max(block - 1) : std::numeric_limits<uint32_t>::max()) + 1;
+            uint32_t cur_base =
+                (block ? block_max(block - 1) : std::numeric_limits<uint32_t>::max()) + 1;
             m_cur_block_max = block_max(block);
             unpack_codecs(m_cur_block_size, block_data);
-            m_freqs_block_data =
-                decoders[cur_doc_codec](block_data,
-                                        m_docs_buf.data(),
-                                        m_cur_block_max - cur_base - (m_cur_block_size - 1),
-                                        m_cur_block_size);
+            m_freqs_block_data = decoders[cur_doc_codec](
+                block_data,
+                m_docs_buf.data(),
+                m_cur_block_max - cur_base - (m_cur_block_size - 1),
+                m_cur_block_size
+            );
             intrinsics::prefetch(m_freqs_block_data);
 
             m_docs_buf[0] += cur_base;
@@ -451,10 +440,10 @@ struct posting_list {
             }
         }
 
-        void PISA_NOINLINE decode_freqs_block()
-        {
-            uint8_t const *next_block = decoders[cur_freq_codec](
-                m_freqs_block_data, m_freqs_buf.data(), std::numeric_limits<uint32_t>::max(), m_cur_block_size);
+        void PISA_NOINLINE decode_freqs_block() {
+            uint8_t const* next_block = decoders[cur_freq_codec](
+                m_freqs_block_data, m_freqs_buf.data(), std::numeric_limits<uint32_t>::max(), m_cur_block_size
+            );
             intrinsics::prefetch(next_block);
             m_freqs_decoded = true;
 
@@ -464,11 +453,11 @@ struct posting_list {
         }
 
         uint32_t m_n;
-        uint8_t const *m_base;
+        uint8_t const* m_base;
         uint32_t m_blocks;
-        uint8_t const *m_block_maxs;
-        uint8_t const *m_block_endpoints;
-        uint8_t const *m_blocks_data;
+        uint8_t const* m_block_maxs;
+        uint8_t const* m_block_endpoints;
+        uint8_t const* m_blocks_data;
         uint64_t m_universe;
 
         uint32_t m_cur_block;
@@ -479,13 +468,13 @@ struct posting_list {
         uint8_t cur_doc_codec;
         uint8_t cur_freq_codec;
 
-        uint8_t const *m_freqs_block_data;
+        uint8_t const* m_freqs_block_data;
         bool m_freqs_decoded;
 
         std::vector<uint32_t> m_docs_buf;
         std::vector<uint32_t> m_freqs_buf;
 
-        block_profiler::counter_type *m_block_profile;
+        block_profiler::counter_type* m_block_profile;
     };
 };
-} // namespace pisa
+}  // namespace pisa
