@@ -12,7 +12,7 @@
 #include "FastPFor/headers/simple16.h"
 #include "FastPFor/headers/variablebyte.h"
 
-#include "VarIntG8IU.h"
+#include "codec/VarIntG8IU.h"
 #include "codec/block_codecs.hpp"
 #include "codec/maskedvbyte.hpp"
 #include "codec/optpfor.hpp"
@@ -21,6 +21,7 @@
 #include "codec/simple16.hpp"
 #include "codec/simple8b.hpp"
 #include "codec/streamvbyte.hpp"
+#include "codec/varint_g8iu.hpp"
 #include "codec/varintgb.hpp"
 #include "util/compiler_attribute.hpp"
 #include "util/util.hpp"

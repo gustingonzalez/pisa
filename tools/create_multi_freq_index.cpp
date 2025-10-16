@@ -13,10 +13,10 @@
 #include "index_types.hpp"
 #include "multi_freq_index.hpp"
 #include "util/index_build_utils.hpp"
+#include "util/progress.hpp"
 #include "util/util.hpp"
 #include "util/verify_collection.hpp" // XXX move to index_build_utils
 #include "multicompression/stats.hpp"
-#include "wand_data_raw.hpp"
 
 #include <CLI/CLI.hpp>
 
@@ -87,7 +87,7 @@ void create_collection(InputCollection const &input,
     if (output_filename) {
         mapper::freeze(coll, (*output_filename).c_str());
         if (check) {
-            verify_collection<binary_freq_collection, CollectionType, wand_data_raw>(
+            verify_collection<binary_freq_collection, CollectionType>(
                 input, (*output_filename).c_str()
             );
         }

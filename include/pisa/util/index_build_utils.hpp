@@ -3,7 +3,6 @@
 #include <spdlog/spdlog.h>
 
 #include "block_inverted_index.hpp"
-#include "block_freq_index.hpp"
 #include "freq_index.hpp"
 #include "multi_freq_index.hpp"
 #include "mappable/mapper.hpp"
@@ -13,7 +12,7 @@ namespace pisa {
 
 template <typename DocsSequence, typename FreqsSequence>
 void get_size_stats(
-    freq_index<DocsSequence, FreqsSequence>& coll, uint64_t& docs_size, uint64_t& freqs_size
+    freq_index<DocsSequence, FreqsSequence>& coll, std::uint64_t& docs_size, std::uint64_t& freqs_size
 ) {
     auto size_tree = mapper::size_tree_of(coll);
     size_tree->dump();
@@ -26,33 +25,13 @@ void get_size_stats(
     }
 }
 
-template <typename BlockCodec, bool Profile>
-void get_size_stats(
-    block_freq_index<BlockCodec, Profile>& coll, uint64_t& docs_size, uint64_t& freqs_size
-) {
-    auto size_tree = mapper::size_tree_of(coll);
-    size_tree->dump();
-    uint64_t total_size = 0;
-    for (auto const& node: size_tree->children) {
-        if (node->name == "m_lists") {
-            total_size = node->size;
-        }
-    }
-
-    freqs_size = 0;
-    for (size_t i = 0; i < coll.size(); ++i) {
-        freqs_size += coll[i].stats_freqs_size();
-    }
-    docs_size = total_size - freqs_size;
-}
-
 template <bool Profile>
 void get_size_stats(
-    multi_freq_index<Profile>& coll, uint64_t& docs_size, uint64_t& freqs_size
+    multi_freq_index<Profile>& coll, std::uint64_t& docs_size, std::uint64_t& freqs_size
 ) {
     auto size_tree = mapper::size_tree_of(coll);
     size_tree->dump();
-    uint64_t total_size = 0;
+    std::uint64_t total_size = 0;
     for (auto const& node: size_tree->children) {
         if (node->name == "m_lists") {
             total_size = node->size;
@@ -60,58 +39,16 @@ void get_size_stats(
     }
 
     freqs_size = 0;
-    for (size_t i = 0; i < coll.size(); ++i) {
+    for (std::size_t i = 0; i < coll.size(); ++i) {
         freqs_size += coll[i].stats_freqs_size();
     }
     docs_size = total_size - freqs_size;
 }
 
-<<<<<<< HEAD
-=======
-template <typename BlockCodec, bool Profile>
-void get_size_stats(
-    block_freq_index<BlockCodec, Profile>& coll, uint64_t& docs_size, uint64_t& freqs_size
-) {
-    auto size_tree = mapper::size_tree_of(coll);
-    size_tree->dump();
-    uint64_t total_size = 0;
-    for (auto const& node: size_tree->children) {
-        if (node->name == "m_lists") {
-            total_size = node->size;
-        }
-    }
-
-    freqs_size = 0;
-    for (size_t i = 0; i < coll.size(); ++i) {
-        freqs_size += coll[i].stats_freqs_size();
-    }
-    docs_size = total_size - freqs_size;
-}
-
-template <bool Profile>
-void get_size_stats(multi_freq_index<Profile> &coll,
-                    uint64_t                  &docs_size,
-                    uint64_t                  &freqs_size) {
-    auto size_tree = mapper::size_tree_of(coll);
-    size_tree->dump();
-    uint64_t total_size = 0;
-    for (auto const &node : size_tree->children) {
-        if (node->name == "m_lists") {
-            total_size = node->size;
-        }
-    }
-
-    freqs_size = 0;
-    for (size_t i = 0; i < coll.size(); ++i) {
-        freqs_size += coll[i].stats_freqs_size();
-    }
-    docs_size = total_size - freqs_size;
-}
-
->>>>>>> 38e740f3 (Add resources for multicompressed index)
 template <typename Collection>
-void dump_stats(Collection& coll, std::string const& type, uint64_t postings) {
-    uint64_t docs_size = 0, freqs_size = 0;
+void dump_stats(Collection& coll, std::string const& type, std::uint64_t postings) {
+    std::uint64_t docs_size = 0;
+    std::uint64_t freqs_size = 0;
     get_size_stats(coll, docs_size, freqs_size);
 
     double bits_per_doc = docs_size * 8.0 / postings;

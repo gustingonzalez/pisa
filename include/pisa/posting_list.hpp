@@ -7,6 +7,22 @@
 #include "util/util.hpp"
 
 namespace pisa {
+
+/**
+ * Decodes next integer. This method is optimal when an unique integer
+ * must be decoded (note: SIMD isn't used here).
+*/
+inline uint8_t const* read_next_vbyte(uint8_t const* in, uint32_t& val) {
+    // Gets the first byte avoiding the continuation bit.
+    uint32_t c = *in++;
+    val = c & 0x7F;
+    // Iterates while the continuation bit be true.
+    for (uint32_t shift = 7; !(c & 0x80); shift += 7) {
+        // Adds, to the output integer, the byte with the adequate shifting.
+        val |= (((c = *in++) & 0x7F) << shift);
+    }
+    return in;
+}
 /**
  * Codec types where each codec number (starting from zero) matches
  * with a 'decode function' inside a selector (array) of function
@@ -62,8 +78,8 @@ static decoder decoders[] {
         out[0] = sum_of_values;
         return in;
     },
-    [](uint8_t const *in, uint32_t *out, uint32_t, size_t) {
-        return TightVariableByte::next(in, out[0]);
+    [](uint8_t const* in, uint32_t* out, uint32_t, size_t) {
+        return read_next_vbyte(in, out[0]);
     },
 };
 
@@ -270,7 +286,7 @@ struct posting_list {
         void PISA_ALWAYSINLINE next()
         {
             ++m_pos_in_block;
-            if ([[unlikely]] (m_pos_in_block == m_cur_block_size)) {
+            if (m_pos_in_block == m_cur_block_size) [[unlikely]] {
                 if (m_cur_block + 1 == m_blocks) {
                     m_cur_docid = m_universe;
                     return;
@@ -284,7 +300,7 @@ struct posting_list {
         void PISA_ALWAYSINLINE next_geq(uint64_t lower_bound)
         {
             assert(lower_bound >= m_cur_docid || position() == 0);
-        if ([[unlikely]] (lower_bound > m_cur_block_max)) {
+        if (lower_bound > m_cur_block_max) [[unlikely]] {
                 // binary search seems to perform worse here
                 if (lower_bound > block_max(m_blocks - 1)) {
                     m_cur_docid = m_universe;
@@ -309,7 +325,7 @@ struct posting_list {
         {
             assert(pos >= position());
             uint64_t block = pos / block_size;
-        if ([[unlikely]] (block != m_cur_block)) {
+        if (block != m_cur_block) [[unlikely]] {
                 decode_docs_block(block);
             }
             while (position() < pos) {
