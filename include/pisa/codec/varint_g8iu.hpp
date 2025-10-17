@@ -17,7 +17,7 @@ namespace pisa {
  * DOI: https://doi.org/10.1145/2063576.2063627
  */
 class VarintG8IUBlockCodec: public BlockCodec {
-    static const uint64_t m_block_size = 128;
+    static const uint64_t m_block_size = 256;
 
   public:
     constexpr static std::string_view name = "block_varintg8iu";

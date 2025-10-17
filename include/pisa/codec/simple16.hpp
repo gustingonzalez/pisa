@@ -12,7 +12,7 @@ namespace pisa {
  * (WWW '08). ACM, New York, NY, USA, 387-396. DOI: https://doi.org/10.1145/1367497.1367550
  */
 class Simple16BlockCodec: public BlockCodec {
-    static constexpr std::uint64_t m_block_size = 128;
+    static constexpr std::uint64_t m_block_size = 256;
 
   public:
     constexpr static std::string_view name = "block_simple16";

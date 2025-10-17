@@ -13,7 +13,7 @@ namespace pisa {
  * https://doi.org/10.1145/2682862.2682870
  */
 class QmxBlockCodec: public BlockCodec {
-    static constexpr std::uint64_t m_block_size = 128;
+    static constexpr std::uint64_t m_block_size = 256;
     static constexpr std::uint64_t m_overflow = 512;
 
   public:

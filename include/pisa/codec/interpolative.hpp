@@ -14,7 +14,7 @@ namespace pisa {
  * Retr. 3(1): 25-47 (2000)
  */
 class InterpolativeBlockCodec: public BlockCodec {
-    static constexpr std::uint64_t m_block_size = 128;
+    static constexpr std::uint64_t m_block_size = 256;
 
   public:
     constexpr static std::string_view name = "block_interpolative";

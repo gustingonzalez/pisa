@@ -11,7 +11,7 @@ namespace pisa {
  * 131-147 (2010)
  */
 class Simple8bBlockCodec: public BlockCodec {
-    static constexpr std::uint64_t m_block_size = 128;
+    static constexpr std::uint64_t m_block_size = 256;
 
   public:
     constexpr static std::string_view name = "block_simple8b";

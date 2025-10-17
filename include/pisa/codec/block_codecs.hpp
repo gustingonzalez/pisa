@@ -112,7 +112,7 @@ class TightVariableByte {
 };
 
 struct interpolative_block {
-    static constexpr std::uint64_t block_size = 128;
+    static constexpr std::uint64_t block_size = 256;
 
     static void
     encode(uint32_t const* in, uint32_t sum_of_values, size_t n, std::vector<uint8_t>& out) {

@@ -13,7 +13,7 @@ namespace pisa {
  * Web Algorithms 2015, 2015.
  */
 class MaskedVByteBlockCodec: public BlockCodec {
-    static constexpr std::uint64_t m_block_size = 128;
+    static constexpr std::uint64_t m_block_size = 256;
     static constexpr std::uint64_t m_overflow = 512;
 
   public:

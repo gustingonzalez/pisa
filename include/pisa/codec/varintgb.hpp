@@ -237,7 +237,7 @@ class VarIntGB {
  * (Eds.). ACM, New York, NY, USA, 1-1. DOI: http://dx.doi.org/10.1145/1498759.1498761
  */
 class VarintGbBlockCodec: public BlockCodec {
-    static constexpr std::uint64_t m_block_size = 128;
+    static constexpr std::uint64_t m_block_size = 256;
 
   public:
     constexpr static std::string_view name = "block_varintgb";
