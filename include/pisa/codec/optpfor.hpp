@@ -16,7 +16,7 @@ namespace pisa {
  * web (WWW '09). ACM, New York, NY, USA, 401-410. DOI: https://doi.org/10.1145/1526709.1526764
  */
 class OptPForBlockCodec: public BlockCodec {
-    struct Codec: FastPForLib::OPTPFor<4, FastPForLib::Simple16<false>> {
+    struct Codec: FastPForLib::OPTPFor<8, FastPForLib::Simple16<false>> {
         uint8_t const* force_b = nullptr;
         uint32_t findBestB(const uint32_t* in, uint32_t len);
     };
