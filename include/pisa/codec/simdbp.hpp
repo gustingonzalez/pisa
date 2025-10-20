@@ -13,7 +13,7 @@ namespace pisa {
  * Softw., Pract. Exper. 45(1): 1-29 (2015)
  */
 class SimdBpBlockCodec: public BlockCodec {
-    static constexpr std::uint64_t m_block_size = 128;
+    static constexpr std::uint64_t m_block_size = 256;
 
   public:
     constexpr static std::string_view name = "block_simdbp";
@@ -27,6 +27,11 @@ class SimdBpBlockCodec: public BlockCodec {
     decode(uint8_t const* in, uint32_t* out, uint32_t sum_of_values, size_t n) const override;
     auto block_size() const noexcept -> std::size_t override { return m_block_size; }
     auto get_name() const noexcept -> std::string_view override { return name; }
+
+    private:
+      void encode_128(
+          uint32_t const* in, std::vector<uint8_t>& out, size_t n, uint32_t b
+      ) const;
 };
 
 }  // namespace pisa
