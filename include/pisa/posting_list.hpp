@@ -1,5 +1,9 @@
 #pragma once
 
+#include <array>
+#include <limits>
+#include <string_view>
+
 #include "codec/block_codecs.hpp"
 #include "multicompression/block_codecs.hpp"
 #include "multicompression/stats.hpp"
@@ -80,6 +84,34 @@ static decoder decoders[]{
     },
     [](uint8_t const* in, uint32_t* out, uint32_t, size_t) { return read_next_vbyte(in, out[0]); },
 };
+
+inline auto codec_id_to_name(uint8_t codec) -> std::string_view
+{
+    static constexpr auto names = [] {
+        constexpr size_t size = 256;
+        std::array<std::string_view, size> map{};
+        map[block_simdbp] = "block_simdbp";
+        map[block_varintg8iu] = "block_varintg8iu";
+        map[block_varintgb] = "block_varintgb";
+        map[block_maskedvbyte] = "block_maskedvbyte";
+        map[block_simple8b] = "block_simple8b";
+        map[block_simple16] = "block_simple16";
+        map[block_streamvbyte] = "block_streamvbyte";
+        map[block_qmx] = "block_qmx";
+        map[block_optpfor] = "block_optpfor";
+        map[block_many_ones] = "block_many_ones";
+        map[block_interpolative] = "block_interpolative";
+        map[block_all_ones] = "block_all_ones";
+        map[single_dummy] = "single_dummy";
+        map[single_vbyte] = "single_vbyte";
+        return map;
+    }();
+
+    if (codec < names.size()) {
+        return names[codec];
+    }
+    return {};
+}
 
 template <bool Profile = false>
 struct posting_list {

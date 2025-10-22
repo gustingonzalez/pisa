@@ -2,9 +2,12 @@
 #include <cstddef>
 #include <cstdint>
 #include <ostream>
+#include <string_view>
 #include <vector>
 
 namespace pisa {
+auto codec_id_to_name(uint8_t codec) -> std::string_view;
+
 struct ChunkStatistic {
     uint8_t Codec{};
     uint32_t ChunkSize{};
@@ -34,13 +37,14 @@ class MulticompressionStatsManager {
     {
         for (size_t chunk_idx = 0; chunk_idx < stats.size(); ++chunk_idx) {
             auto const &stat = stats[chunk_idx];
+            auto const codec_name = codec_id_to_name(stat.Codec);
 
             output << plist_id << ","
                    << plist_size << ","
                    << chunk_idx << ","
                    << stat.ChunkSize << ","
                    // << (stat.AreFreqs ? "F" : "D") << ","
-                   << static_cast<uint32_t>(stat.Codec) << ","
+                   << codec_name << ","
                    << static_cast<uint64_t>(stat.CompressedSize) << ",";
 
             for (size_t i = 0; i < stat.Gaps.size(); ++i) {
