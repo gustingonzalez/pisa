@@ -33,7 +33,9 @@ add_tool(taily-stats taily_stats.cpp)
 add_tool(taily-thresholds taily_thresholds.cpp)
 add_tool(extract-maxscores extract_maxscores.cpp)
 add_tool(lookup-table lookup_table.cpp)
+find_package(ZLIB REQUIRED)
 add_tool(compress_mc_inverted_index create_multi_freq_index.cpp)
+target_link_libraries(compress_mc_inverted_index ZLIB::ZLIB)
 
 configure_file(../script/ir-datasets.py ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ir-datasets COPYONLY)
 

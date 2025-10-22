@@ -1,58 +1,28 @@
 #pragma once
+#include <cstddef>
+#include <cstdint>
 #include <ostream>
-#include <sstream>
+#include <vector>
 
 namespace pisa {
 struct ChunkStatistic {
-    uint8_t Codec;
-    uint32_t ChunkSize;
-    uint32_t CompressedSize;
-    uint32_t ZeroCount;
-    uint32_t LesserThan8Count;
-    uint32_t MinGap;
-    uint32_t MinNum;
-    uint32_t MaxGap;
-    uint32_t MaxNum;
-    float AvgDistanceGap;
-    float AvgDistanceNum;
+    uint8_t Codec{};
+    uint32_t ChunkSize{};
+    size_t CompressedSize{};
+    bool AreFreqs{};
+    std::vector<uint32_t> Gaps;
 
     ChunkStatistic(std::vector<uint32_t> &gaps,
                    uint32_t chunk_size,
                    uint8_t codec,
                    size_t compressed_size,
                    bool are_freqs)
-    {
-        Codec = codec;
-        ChunkSize = chunk_size;
-        CompressedSize = compressed_size;
-
-        std::vector<uint32_t> numbers(ChunkSize);
-
-        // Adds 1 to each gaps[n] with n >= 0, if the list are freqs.
-        // Adds 1 to each gaps[n] with n > 0, if the list are docs.
-        numbers[0] = are_freqs ? gaps[0] + 1 : gaps[0];
-        for (auto i = 1; i < ChunkSize; ++i) {
-            numbers[i] = numbers[i - 1] + gaps[i] + 1;
-        }
-
-        auto gaps_end = gaps.begin() + ChunkSize;
-        ZeroCount = std::count(gaps.begin(), gaps_end, 0);
-        LesserThan8Count = std::count_if(gaps.begin(), gaps_end, [](auto v) { return v < 8; });
-
-        MinGap = *std::min_element(gaps.begin(), gaps_end);
-        MinNum = numbers[0];
-
-        MaxGap = *std::max_element(gaps.begin(), gaps_end);
-        MaxNum = numbers[ChunkSize - 1];
-
-        AvgDistanceNum = (float) MaxNum / ChunkSize;
-        AvgDistanceGap = gaps[0];
-        for (auto i = 1; i < ChunkSize; ++i) {
-            int32_t distance = gaps[i - 1] - gaps[i];
-            AvgDistanceGap += abs(distance);
-        }
-        AvgDistanceGap /= ChunkSize;
-    }
+        : Codec(codec),
+          ChunkSize(chunk_size),
+          CompressedSize(compressed_size),
+          AreFreqs(are_freqs),
+          Gaps(gaps.begin(), gaps.begin() + chunk_size)
+    {}
 };
 
 class MulticompressionStatsManager {
@@ -62,34 +32,48 @@ class MulticompressionStatsManager {
                             std::vector<ChunkStatistic> &stats,
                             std::ostream &output)
     {
-        output << std::fixed;
+        for (size_t chunk_idx = 0; chunk_idx < stats.size(); ++chunk_idx) {
+            auto const &stat = stats[chunk_idx];
 
-        std::stringstream ss;
-        ss << std::fixed << std::setprecision(2);
-        for (auto stat : stats) {
-            ss << std::to_string(plist_id) << ",";
-            ss << std::to_string(plist_size) << ",";
-            ss << std::to_string(stat.Codec) << ",";
-            ss << std::to_string(stat.ChunkSize) << ",";
-            ss << std::to_string(stat.CompressedSize) << ",";
-            ss << std::to_string(stat.MinGap) << ",";
-            ss << std::to_string(stat.MinNum) << ",";
-            ss << std::to_string(stat.MaxGap) << ",";
-            ss << std::to_string(stat.MaxNum) << ",";
-            ss << stat.AvgDistanceGap << ",";
-            ss << stat.AvgDistanceNum << ",";
-            ss << std::to_string(stat.ZeroCount) << ",";
-            ss << std::to_string(stat.LesserThan8Count) << "\n";
+            output << plist_id << ","
+                   << plist_size << ","
+                   << chunk_idx << ","
+                   << stat.ChunkSize << ","
+                   // << (stat.AreFreqs ? "F" : "D") << ","
+                   << static_cast<uint32_t>(stat.Codec) << ","
+                   << static_cast<uint64_t>(stat.CompressedSize) << ",";
+
+            for (size_t i = 0; i < stat.Gaps.size(); ++i) {
+                if (i != 0) {
+                    output << " ";
+                }
+                output << stat.Gaps[i];
+            }
+            output << "\n";
         }
-        output << ss.str();
     }
 
+
+    /**
+     * CSV fields:
+     * - posting_list_id: Identifier of the posting list.
+     * - posting_list_size: Number of elements in the posting list.
+     * - chunk_index: Zero-based chunk index within the posting list.
+     * - codec: Compression codec identifier applied to the chunk.
+     * - chunk_size: Number of values in the chunk.
+     * - compressed_size: Chunk size in bytes after compression.
+     * - values: Payload (for docs: gaps-1, for freqs: values-1).
+     */
     static void write_headers(std::ostream &output)
     {
-        output << "PostingListId,PostingListSize,Codec,ChunkSize,";
-        output << "CompressedSize,MinGap,MinNum,MaxGap,MaxNum,";
-        output << "AvgDistanceGap,AvgDistanceNum,ZeroCount,";
-        output << "LesserThan8Count\n";
+        output
+            << "posting_list_id,"
+            << "posting_list_size,"
+            << "chunk_index,"
+            << "chunk_size,"
+            << "codec,"
+            << "compressed_size,"
+            << "values\n";
     }
 };
 } // namespace pisa

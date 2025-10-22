@@ -1,12 +1,14 @@
 #include <algorithm>
-#include <fstream>
-#include <iostream>
 #include <numeric>
 #include <optional>
 #include <thread>
 
 #include "boost/algorithm/string/predicate.hpp"
 #include "spdlog/spdlog.h"
+#include <string>
+#include <zlib.h>
+#include <sstream>
+#include <stdexcept>
 
 #include "mappable/mapper.hpp"
 
@@ -40,13 +42,51 @@ void create_collection(InputCollection const &input,
     {
         pisa::progress progress("Create index", input.size());
 
-        std::ofstream odstats;
-        std::ofstream ofstats;
+        gzFile docs_stats_gz = nullptr;
+        gzFile freqs_stats_gz = nullptr;
+        std::ostringstream docs_csv_buf;
+        std::ostringstream freqs_csv_buf;
+        auto open_gzip_file = [](std::string const& path) -> gzFile {
+            gzFile file = gzopen(path.c_str(), "wb");
+            if (file == nullptr) {
+                throw std::runtime_error("Unable to open gzip file: " + path);
+            }
+            return file;
+        };
+        auto close_gzip_file = [](gzFile file) {
+            if (file == nullptr) {
+                return;
+            }
+            int rc = gzclose(file);
+            if (rc != Z_OK) {
+                throw std::runtime_error("Failed to close gzip file");
+            }
+        };
+        auto write_gzip = [](gzFile file, std::string const& payload) {
+            if (payload.empty()) {
+                return;
+            }
+            int written = gzwrite(file, payload.data(), static_cast<unsigned int>(payload.size()));
+            if (written == 0) {
+                int errnum = 0;
+                const char* msg = gzerror(file, &errnum);
+                throw std::runtime_error(
+                    std::string("Failed to write gzip data: ") + (msg ? msg : "unknown error")
+                );
+            }
+        };
         if (stats) {
-            odstats.open(output_filename.value() + ".stats.docs");
-            pisa::MulticompressionStatsManager::write_headers(odstats);
-            ofstats.open(output_filename.value() + ".stats.freqs");
-            pisa::MulticompressionStatsManager::write_headers(ofstats);
+            docs_stats_gz = open_gzip_file(output_filename.value() + ".stats.docs.gz");
+            docs_csv_buf.str("");
+            docs_csv_buf.clear();
+            pisa::MulticompressionStatsManager::write_headers(docs_csv_buf);
+            write_gzip(docs_stats_gz, docs_csv_buf.str());
+
+            freqs_stats_gz = open_gzip_file(output_filename.value() + ".stats.freqs.gz");
+            freqs_csv_buf.str("");
+            freqs_csv_buf.clear();
+            pisa::MulticompressionStatsManager::write_headers(freqs_csv_buf);
+            write_gzip(freqs_stats_gz, freqs_csv_buf.str());
         }
 
         auto plist_id = 0;
@@ -59,8 +99,19 @@ void create_collection(InputCollection const &input,
                 builder.add_posting_list(size, plist.docs.begin(), plist.freqs.begin(), freqs_sum);
 
             if (stats) {
-                pisa::MulticompressionStatsManager::write_stats(plist_id, size, dstats, odstats);
-                pisa::MulticompressionStatsManager::write_stats(plist_id, size, fstats, ofstats);
+                docs_csv_buf.str("");
+                docs_csv_buf.clear();
+                pisa::MulticompressionStatsManager::write_stats(
+                    plist_id, size, dstats, docs_csv_buf
+                );
+                write_gzip(docs_stats_gz, docs_csv_buf.str());
+
+                freqs_csv_buf.str("");
+                freqs_csv_buf.clear();
+                pisa::MulticompressionStatsManager::write_stats(
+                    plist_id, size, fstats, freqs_csv_buf
+                );
+                write_gzip(freqs_stats_gz, freqs_csv_buf.str());
                 plist_id++;
             }
 
@@ -68,8 +119,8 @@ void create_collection(InputCollection const &input,
             postings += size;
         }
         if (stats) {
-            odstats.close();
-            ofstats.close();
+            close_gzip_file(docs_stats_gz);
+            close_gzip_file(freqs_stats_gz);
         }
     }
 
