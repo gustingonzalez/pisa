@@ -39,12 +39,6 @@ void VarintG8IUBlockCodec::encode(
     thread_local Codec varint_codec;
     thread_local std::array<std::uint8_t, 2 * 4 * m_block_size> buf{};
     assert(n <= m_block_size);
-
-    if (n < m_block_size) {
-        interpolative_block::encode(in, sum_of_values, n, out);
-        return;
-    }
-
     size_t out_len = buf.size();
 
     const uint32_t* src = in;
@@ -63,10 +57,6 @@ uint8_t const*
 VarintG8IUBlockCodec::decode(uint8_t const* in, uint32_t* out, uint32_t sum_of_values, size_t n) const {
     static Codec varint_codec;  // decodeBlock is thread-safe
     assert(n <= m_block_size);
-
-    if (n < m_block_size) [[unlikely]] {
-        return interpolative_block::decode(in, out, sum_of_values, n);
-    }
 
     size_t out_len = 0;
     uint8_t const* src = in;
