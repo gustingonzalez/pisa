@@ -1,10 +1,21 @@
 #pragma once
 
+#include <algorithm>
 #include <array>
 #include <limits>
 #include <string_view>
+#include <vector>
 
 #include "codec/block_codecs.hpp"
+#include "codec/maskedvbyte.hpp"
+#include "codec/optpfor.hpp"
+#include "codec/qmx.hpp"
+#include "codec/simdbp.hpp"
+#include "codec/simple16.hpp"
+#include "codec/simple8b.hpp"
+#include "codec/streamvbyte.hpp"
+#include "codec/varint_g8iu.hpp"
+#include "codec/varintgb.hpp"
 #include "multicompression/block_codecs.hpp"
 #include "multicompression/stats.hpp"
 #include "util/block_profiler.hpp"
@@ -63,16 +74,39 @@ enum CodecTypes {
 };
 
 typedef uint8_t const* (*decoder)(uint8_t const*, uint32_t*, uint32_t, size_t);
+
+template <typename Codec>
+inline Codec const& block_codec_instance()
+{
+    static const Codec codec{};
+    return codec;
+}
+
+template <typename Codec>
+inline uint8_t const*
+decode_with(uint8_t const* in, uint32_t* out, uint32_t sum_of_values, size_t n)
+{
+    return block_codec_instance<Codec>().decode(in, out, sum_of_values, n);
+}
+
+template <typename Codec>
+inline void encode_with(
+    uint32_t const* in, uint32_t sum_of_values, size_t n, std::vector<uint8_t>& out
+)
+{
+    block_codec_instance<Codec>().encode(in, sum_of_values, n, out);
+}
+
 static decoder decoders[]{
-    simdbp_block::decode,
-    varint_G8IU_block::decode,
-    varintgb_block::decode,
-    maskedvbyte_block::decode,
-    simple8b_block::decode,
-    simple16_block::decode,
-    streamvbyte_block::decode,
-    qmx_block::decode,
-    optpfor_block::decode,
+    decode_with<SimdBpBlockCodec>,
+    decode_with<VarintG8IUBlockCodec>,
+    decode_with<VarintGbBlockCodec>,
+    decode_with<MaskedVByteBlockCodec>,
+    decode_with<Simple8bBlockCodec>,
+    decode_with<Simple16BlockCodec>,
+    decode_with<StreamVByteBlockCodec>,
+    decode_with<QmxBlockCodec>,
+    decode_with<OptPForBlockCodec>,
     many_ones_block::decode,
     interpolative_block::decode,
     all_ones_block::decode,
@@ -230,7 +264,8 @@ struct posting_list {
             } else {
                 std::vector<uint8_t> buf;
                 TightVariableByte::encode_single(in[0], buf);
-                // maskedvbyte_block::encode(in, sum_of_values, n, buf);
+                // MaskedVByteBlockCodec would encode into buf here, but the
+                // single-value vbyte fallback is faster.
                 out.insert(out.end(), buf.data(), buf.data() + buf.size());
                 return {single_vbyte, buf.size()};
             }
@@ -250,26 +285,26 @@ struct posting_list {
 
         // Encodes according the minimum integers required for varint.
         if (n >= 8) {
-            varint_G8IU_block::encode(in, sum_of_values, n, encoded[block_varintg8iu]);
+            encode_with<VarintG8IUBlockCodec>(in, sum_of_values, n, encoded[block_varintg8iu]);
             sizes[block_varintg8iu] = encoded[block_varintg8iu].size();
         }
 
         // Encodes considering that BP and PFD only handle chunks of block size.
         if (n == block_size) {
-            simdbp_block::encode(in, sum_of_values, n, encoded[block_simdbp]);
-            optpfor_block::encode(in, sum_of_values, n, encoded[block_optpfor]);
+            encode_with<SimdBpBlockCodec>(in, sum_of_values, n, encoded[block_simdbp]);
+            encode_with<OptPForBlockCodec>(in, sum_of_values, n, encoded[block_optpfor]);
             sizes[block_simdbp] = encoded[block_simdbp].size();
             sizes[block_optpfor] = encoded[block_optpfor].size();
         }
 
         // Encoders that don't need a special number of integers.
         interpolative_block::encode(in, sum_of_values, n, encoded[block_interpolative]);
-        streamvbyte_block::encode(in, sum_of_values, n, encoded[block_streamvbyte]);
-        maskedvbyte_block::encode(in, sum_of_values, n, encoded[block_maskedvbyte]);
-        simple8b_block::encode(in, sum_of_values, n, encoded[block_simple8b]);
-        simple16_block::encode(in, sum_of_values, n, encoded[block_simple16]);
-        varintgb_block::encode(in, sum_of_values, n, encoded[block_varintgb]);
-        qmx_block::encode(in, sum_of_values, n, encoded[block_qmx]);
+        encode_with<StreamVByteBlockCodec>(in, sum_of_values, n, encoded[block_streamvbyte]);
+        encode_with<MaskedVByteBlockCodec>(in, sum_of_values, n, encoded[block_maskedvbyte]);
+        encode_with<Simple8bBlockCodec>(in, sum_of_values, n, encoded[block_simple8b]);
+        encode_with<Simple16BlockCodec>(in, sum_of_values, n, encoded[block_simple16]);
+        encode_with<VarintGbBlockCodec>(in, sum_of_values, n, encoded[block_varintgb]);
+        encode_with<QmxBlockCodec>(in, sum_of_values, n, encoded[block_qmx]);
         sizes[block_interpolative] = encoded[block_interpolative].size();
         sizes[block_streamvbyte] = encoded[block_streamvbyte].size();
         sizes[block_maskedvbyte] = encoded[block_maskedvbyte].size();

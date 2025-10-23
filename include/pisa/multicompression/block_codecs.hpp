@@ -1,267 +1,16 @@
 #pragma once
 
 #include <algorithm>
-#include <array>
 #include <cstdint>
 #include <cstring>
 #include <limits>
-#include <type_traits>
 #include <vector>
 
-#include "FastPFor/headers/optpfor.h"
 #include "FastPFor/headers/simple16.h"
-#include "FastPFor/headers/variablebyte.h"
 
-#include "codec/VarIntG8IU.h"
-#include "codec/block_codecs.hpp"
-#include "codec/maskedvbyte.hpp"
-#include "codec/optpfor.hpp"
-#include "codec/qmx.hpp"
-#include "codec/simdbp.hpp"
 #include "codec/simple16.hpp"
-#include "codec/simple8b.hpp"
-#include "codec/streamvbyte.hpp"
-#include "codec/varint_g8iu.hpp"
-#include "codec/varintgb.hpp"
-#include "util/compiler_attribute.hpp"
-#include "util/util.hpp"
 
 namespace pisa {
-
-struct simdbp_block {
-    static constexpr std::uint64_t block_size = 128;
-
-    static void encode(
-        std::uint32_t const* in,
-        std::uint32_t sum_of_values,
-        std::size_t n,
-        std::vector<std::uint8_t>& out
-    ) {
-        assert(n <= block_size);
-        static const SimdBpBlockCodec codec{};
-        codec.encode(in, sum_of_values, n, out);
-    }
-
-    static std::uint8_t const* decode(
-        std::uint8_t const* in,
-        std::uint32_t* out,
-        std::uint32_t sum_of_values,
-        std::size_t n
-    ) {
-        assert(n <= block_size);
-        static const SimdBpBlockCodec codec{};
-        return codec.decode(in, out, sum_of_values, n);
-    }
-};
-
-struct maskedvbyte_block {
-    static constexpr std::uint64_t block_size = 128;
-
-    static void encode(
-        std::uint32_t const* in,
-        std::uint32_t sum_of_values,
-        std::size_t n,
-        std::vector<std::uint8_t>& out
-    ) {
-        assert(n <= block_size);
-        static const MaskedVByteBlockCodec codec{};
-        codec.encode(in, sum_of_values, n, out);
-    }
-
-    static std::uint8_t const* decode(
-        std::uint8_t const* in,
-        std::uint32_t* out,
-        std::uint32_t sum_of_values,
-        std::size_t n
-    ) {
-        assert(n <= block_size);
-        static const MaskedVByteBlockCodec codec{};
-        return codec.decode(in, out, sum_of_values, n);
-    }
-};
-
-struct simple8b_block {
-    static constexpr std::uint64_t block_size = 128;
-
-    static void encode(
-        std::uint32_t const* in,
-        std::uint32_t sum_of_values,
-        std::size_t n,
-        std::vector<std::uint8_t>& out
-    ) {
-        assert(n <= block_size);
-        static const Simple8bBlockCodec codec{};
-        codec.encode(in, sum_of_values, n, out);
-    }
-
-    static std::uint8_t const* decode(
-        std::uint8_t const* in,
-        std::uint32_t* out,
-        std::uint32_t sum_of_values,
-        std::size_t n
-    ) {
-        assert(n <= block_size);
-        static const Simple8bBlockCodec codec{};
-        return codec.decode(in, out, sum_of_values, n);
-    }
-};
-
-struct simple16_block {
-    static constexpr std::uint64_t block_size = 128;
-
-    static void encode(
-        std::uint32_t const* in,
-        [[maybe_unused]] std::uint32_t sum_of_values,
-        std::size_t n,
-        std::vector<std::uint8_t>& out
-    ) {
-        assert(n <= block_size);
-        static const Simple16BlockCodec codec{};
-        codec.encode(in, sum_of_values, n, out);
-    }
-
-    static std::uint8_t const* decode(
-        std::uint8_t const* in,
-        std::uint32_t* out,
-        [[maybe_unused]] std::uint32_t sum_of_values,
-        std::size_t n
-    ) {
-        assert(n <= block_size);
-        static const Simple16BlockCodec codec{};
-        return codec.decode(in, out, sum_of_values, n);
-    }
-};
-
-struct streamvbyte_block {
-    static constexpr std::uint64_t block_size = 128;
-
-    static void encode(
-        std::uint32_t const* in,
-        std::uint32_t sum_of_values,
-        std::size_t n,
-        std::vector<std::uint8_t>& out
-    ) {
-        assert(n <= block_size);
-        static const StreamVByteBlockCodec codec{};
-        codec.encode(in, sum_of_values, n, out);
-    }
-
-    static std::uint8_t const* decode(
-        std::uint8_t const* in,
-        std::uint32_t* out,
-        std::uint32_t sum_of_values,
-        std::size_t n
-    ) {
-        assert(n <= block_size);
-        static const StreamVByteBlockCodec codec{};
-        return codec.decode(in, out, sum_of_values, n);
-    }
-};
-
-struct qmx_block {
-    static constexpr std::uint64_t block_size = 128;
-
-    static void encode(
-        std::uint32_t const* in,
-        std::uint32_t sum_of_values,
-        std::size_t n,
-        std::vector<std::uint8_t>& out
-    ) {
-        assert(n <= block_size);
-        static const QmxBlockCodec codec{};
-        codec.encode(in, sum_of_values, n, out);
-    }
-
-    static std::uint8_t const* decode(
-        std::uint8_t const* in,
-        std::uint32_t* out,
-        std::uint32_t sum_of_values,
-        std::size_t n
-    ) {
-        assert(n <= block_size);
-        static const QmxBlockCodec codec{};
-        return codec.decode(in, out, sum_of_values, n);
-    }
-};
-
-struct varintgb_block {
-    static constexpr std::uint64_t block_size = 128;
-
-    static void encode(
-        std::uint32_t const* in,
-        std::uint32_t sum_of_values,
-        std::size_t n,
-        std::vector<std::uint8_t>& out
-    ) {
-        assert(n <= block_size);
-        static const VarintGbBlockCodec codec{};
-        codec.encode(in, sum_of_values, n, out);
-    }
-
-    static std::uint8_t const* decode(
-        std::uint8_t const* in,
-        std::uint32_t* out,
-        std::uint32_t sum_of_values,
-        std::size_t n
-    ) {
-        assert(n <= block_size);
-        static const VarintGbBlockCodec codec{};
-        return codec.decode(in, out, sum_of_values, n);
-    }
-};
-
-struct varint_G8IU_block {
-    static constexpr std::uint64_t block_size = 128;
-
-    static void encode(
-        std::uint32_t const* in,
-        std::uint32_t sum_of_values,
-        std::size_t n,
-        std::vector<std::uint8_t>& out
-    ) {
-        assert(n <= block_size);
-        static const VarintG8IUBlockCodec codec{};
-        codec.encode(in, sum_of_values, n, out);
-    }
-
-    static std::uint8_t const* decode(
-        std::uint8_t const* in,
-        std::uint32_t* out,
-        std::uint32_t sum_of_values,
-        std::size_t n
-    ) {
-        assert(n <= block_size);
-        static const VarintG8IUBlockCodec codec{};
-        return codec.decode(in, out, sum_of_values, n);
-    }
-};
-
-struct optpfor_block {
-    static constexpr std::uint64_t block_size = 128;
-
-    static void encode(
-        std::uint32_t const* in,
-        std::uint32_t sum_of_values,
-        std::size_t n,
-        std::vector<std::uint8_t>& out
-    ) {
-        assert(n <= block_size);
-        static const OptPForBlockCodec codec{};
-        codec.encode(in, sum_of_values, n, out);
-    }
-
-    static std::uint8_t const* decode(
-        std::uint8_t const* in,
-        std::uint32_t* out,
-        std::uint32_t sum_of_values,
-        std::size_t n
-    ) {
-        assert(n <= block_size);
-        static const OptPForBlockCodec codec{};
-        return codec.decode(in, out, sum_of_values, n);
-    }
-};
-
 struct all_ones_block {
     static constexpr std::uint64_t block_size = 128;
 
@@ -338,13 +87,14 @@ struct many_ones_block {
         std::size_t n,
         std::vector<std::uint8_t>& out
     ) {
+        static Simple16BlockCodec simple16_codec{};
         std::uint32_t exception_count = count_exceptions(in, sum_of_values, n);
         if (exception_count > n * exception_threshold) {
             return false;
         }
         auto exceptions = compute_exceptions(in, sum_of_values, n);
         exceptions.insert(exceptions.begin(), exception_count - 1);
-        simple16_block::encode(exceptions.data(), sum_of_values, exception_count * 2 + 1, out);
+        simple16_codec.encode(exceptions.data(), sum_of_values, exception_count * 2 + 1, out);
         return true;
     }
 
