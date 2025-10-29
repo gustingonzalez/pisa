@@ -56,6 +56,7 @@ enum CodecTypes {
     block_many_ones,
     block_interpolative,
     block_all_ones,
+    block_bit_packing,
 
     // Codecs below are used as fallback in order to read posting lists
     // having only a single element. Note that no overhead is required
@@ -110,8 +111,9 @@ static decoder decoders[]{
     many_ones_block::decode,
     interpolative_block::decode,
     all_ones_block::decode,
+    BitPackingBlockCodec::decode,
     // Note that 'dummy parameters' are used (i.e. 'size_t') to allow generic
-    // calls when decoding, such as: decoders[11].decode(in, out, s, n)
+    // calls when decoding, such as: decoders[codec].decode(in, out, s, n)
     [](uint8_t const* in, uint32_t* out, uint32_t sum_of_values, size_t) {
         out[0] = sum_of_values;
         return in;
@@ -136,6 +138,7 @@ inline auto codec_id_to_name(uint8_t codec) -> std::string_view
         map[block_many_ones] = "block_many_ones";
         map[block_interpolative] = "block_interpolative";
         map[block_all_ones] = "block_all_ones";
+        map[block_bit_packing] = "block_bit_packing";
         map[single_dummy] = "single_dummy";
         map[single_vbyte] = "single_vbyte";
         return map;
@@ -273,11 +276,12 @@ struct posting_list {
             return {block_all_ones, 0};
         }
 
-        // Encodeds of 'in'.
-        std::vector<std::vector<uint8_t>> encoded(11);
+        // Encodeds of 'in' (except bit-packing which defers encoding).
+        constexpr auto codec_count = block_bit_packing + 1;
+        std::vector<std::vector<uint8_t>> encoded(codec_count);
 
         // Starts encodes sizes in the max possible value.
-        std::vector<size_t> sizes(11, SIZE_MAX);
+        std::vector<size_t> sizes(codec_count, SIZE_MAX);
 
         if (many_ones_block::encode(in, sum_of_values, n, encoded[block_many_ones])) {
             sizes[block_many_ones] = encoded[block_many_ones].size();
@@ -289,12 +293,14 @@ struct posting_list {
             sizes[block_varintg8iu] = encoded[block_varintg8iu].size();
         }
 
-        // Encodes considering that BP and PFD only handle chunks of block size.
+        // Encodes considering that PFD only handle chunks of block size.
         if (n == block_size) {
             encode_with<SimdBpBlockCodec>(in, sum_of_values, n, encoded[block_simdbp]);
             encode_with<OptPForBlockCodec>(in, sum_of_values, n, encoded[block_optpfor]);
-            sizes[block_simdbp] = encoded[block_simdbp].size();
             sizes[block_optpfor] = encoded[block_optpfor].size();
+            sizes[block_simdbp] = encoded[block_simdbp].size();
+        } else {
+            sizes[block_bit_packing] = BitPackingBlockCodec::compute_encoded_size(in, n);
         }
 
         // Encoders that don't need a special number of integers.
@@ -305,6 +311,7 @@ struct posting_list {
         encode_with<Simple16BlockCodec>(in, sum_of_values, n, encoded[block_simple16]);
         encode_with<VarintGbBlockCodec>(in, sum_of_values, n, encoded[block_varintgb]);
         encode_with<QmxBlockCodec>(in, sum_of_values, n, encoded[block_qmx]);
+        BitPackingBlockCodec::encode(in, sum_of_values, n, encoded[block_bit_packing]);
         sizes[block_interpolative] = encoded[block_interpolative].size();
         sizes[block_streamvbyte] = encoded[block_streamvbyte].size();
         sizes[block_maskedvbyte] = encoded[block_maskedvbyte].size();
@@ -313,11 +320,17 @@ struct posting_list {
         sizes[block_varintgb] = encoded[block_varintgb].size();
         sizes[block_qmx] = encoded[block_qmx].size();
 
-        // Selects the encoder that generates the minimum number of bytes.
+        // Select the encoder that generates the minimum number of bytes.
         uint8_t codec = std::min_element(sizes.begin(), sizes.end()) - sizes.begin();
-        size_t out_len = encoded[codec].size();
-        out.insert(out.end(), encoded[codec].data(), encoded[codec].data() + out_len);
-        return {codec, sizes[codec]};
+        size_t out_len = sizes[codec];
+
+        // Encode using the 'winner' codec (bit-packing deferred until now).
+        if (codec == block_bit_packing) {
+            BitPackingBlockCodec::encode(in, sum_of_values, n, out);
+        } else {
+            out.insert(out.end(), encoded[codec].data(), encoded[codec].data() + encoded[codec].size());
+        }
+        return {codec, out_len};
     }
 
     class document_enumerator {
