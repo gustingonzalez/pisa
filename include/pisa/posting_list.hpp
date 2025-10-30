@@ -295,11 +295,17 @@ struct posting_list {
 
         // Encodes considering that PFD only handle chunks of block size.
         if (n == block_size) {
-            encode_with<SimdBpBlockCodec>(in, sum_of_values, n, encoded[block_simdbp]);
             encode_with<OptPForBlockCodec>(in, sum_of_values, n, encoded[block_optpfor]);
             sizes[block_optpfor] = encoded[block_optpfor].size();
+        }
+
+        // SIMD-BP is only implemented for blocks of size 128 or 256. If `n` is
+        // not one of those sizes, use 'simple' bit-packing instead.
+        if (n == block_size && (block_size == 128 || block_size == 256)) {
+            encode_with<SimdBpBlockCodec>(in, sum_of_values, n, encoded[block_simdbp]);
             sizes[block_simdbp] = encoded[block_simdbp].size();
         } else {
+            // Defer bit-packing encoding.
             sizes[block_bit_packing] = BitPackingBlockCodec::compute_encoded_size(in, n);
         }
 
