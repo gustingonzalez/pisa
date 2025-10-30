@@ -28,6 +28,11 @@ class InterpolativeBlockCodec: public BlockCodec {
     decode(uint8_t const* in, uint32_t* out, uint32_t sum_of_values, size_t n) const override;
     auto block_size() const noexcept -> std::size_t override { return m_block_size; }
     auto get_name() const noexcept -> std::string_view override { return name; }
+
+    /**
+     * Computes encoded size without actually encoding.
+     */
+    static size_t compute_encoded_size(uint32_t const* in, uint32_t sum_of_values, size_t n);
 };
 
 }  // namespace pisa

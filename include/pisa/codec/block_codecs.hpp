@@ -114,6 +114,75 @@ class TightVariableByte {
 struct interpolative_block {
     static constexpr std::uint64_t block_size = 128;
 
+    /**
+     * Returns the number of bits that would be written by
+     * `bit_writer::write_int`.
+     */
+    static size_t compute_write_int_bit_size(uint32_t val, uint32_t u) {
+        assert(u > 0);
+        assert(val < u);
+        auto b = broadword::msb(u);
+        uint64_t m = (uint64_t(1) << (b + 1)) - u;
+
+        // Note: the +1 comes from the extra bit added by `write(val & 1, 1)`.
+        return (val < m) ? b : (b + 1);
+    }
+
+    /**
+     * Returns the number of bits that would be written by
+     * `bit_writer::write_interpolative`.
+     */
+    static size_t
+    compute_write_interpolative_bit_size(uint32_t const* in, size_t n, uint32_t low, uint32_t high) {
+        if (n == 0) {
+            return 0;
+        }
+        assert(low <= high);
+
+        size_t h = n / 2;
+        uint32_t val = in[h];
+        size_t bits = compute_write_int_bit_size(val - low, high - low + 1);
+        bits += compute_write_interpolative_bit_size(in, h, low, val);
+        bits += compute_write_interpolative_bit_size(in + h + 1, n - h - 1, val, high);
+        return bits;
+    }
+
+    /**
+     * Computes encoded size without actually encoding. Matches logic with
+     * `encode`.
+     */
+    static size_t compute_encoded_size(uint32_t const* in, uint32_t sum_of_values, size_t n) {
+        if (n == 0) {
+            return 0;
+        }
+        assert(n <= block_size);
+        thread_local std::array<std::uint32_t, block_size> inbuf{};
+
+        inbuf[0] = in[0];
+        for (size_t i = 1; i < n; ++i) {
+            inbuf[i] = inbuf[i - 1] + in[i];
+        }
+
+        size_t encoded_byte_len = 0;
+
+        // If `sum_of_values` must be encoded as header (by using
+        // `TightVariableByte`)...
+        if (sum_of_values == uint32_t(-1)) {
+            // Use 'max(1, ceil(bitlen(n)/7)' formula. Note: `encode` uses
+            // `inbuf[n - 1]` instead of `sum_of_values`; so this matches that
+            // behavior.
+            sum_of_values = inbuf[n - 1];
+            unsigned bitlen = (sum_of_values == 0) ? 1 : 32 - __builtin_clz(sum_of_values);
+            encoded_byte_len += std::max<size_t>(1, (bitlen + 6) / 7);   // ceil(bitlen/7)
+        }
+
+        // Compute payload encoding size.
+        size_t payload_bit_len = compute_write_interpolative_bit_size(inbuf.data(), n - 1, 0, sum_of_values);
+
+        encoded_byte_len += ceil_div(payload_bit_len, 8);
+        return encoded_byte_len;
+    }
+
     static void
     encode(uint32_t const* in, uint32_t sum_of_values, size_t n, std::vector<uint8_t>& out) {
         assert(n <= block_size);
