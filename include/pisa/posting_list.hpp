@@ -310,7 +310,8 @@ struct posting_list {
         }
 
         // Encoders that don't need a special number of integers.
-        interpolative_block::encode(in, sum_of_values, n, encoded[block_interpolative]);
+        // Precompute interpolative size without encoding (optimization)
+        sizes[block_interpolative] = interpolative_block::compute_encoded_size(in, sum_of_values, n);
         encode_with<StreamVByteBlockCodec>(in, sum_of_values, n, encoded[block_streamvbyte]);
         encode_with<MaskedVByteBlockCodec>(in, sum_of_values, n, encoded[block_maskedvbyte]);
         encode_with<Simple8bBlockCodec>(in, sum_of_values, n, encoded[block_simple8b]);
@@ -318,7 +319,6 @@ struct posting_list {
         encode_with<VarintGbBlockCodec>(in, sum_of_values, n, encoded[block_varintgb]);
         encode_with<QmxBlockCodec>(in, sum_of_values, n, encoded[block_qmx]);
         BitPackingBlockCodec::encode(in, sum_of_values, n, encoded[block_bit_packing]);
-        sizes[block_interpolative] = encoded[block_interpolative].size();
         sizes[block_streamvbyte] = encoded[block_streamvbyte].size();
         sizes[block_maskedvbyte] = encoded[block_maskedvbyte].size();
         sizes[block_simple8b] = encoded[block_simple8b].size();
@@ -330,9 +330,11 @@ struct posting_list {
         uint8_t codec = std::min_element(sizes.begin(), sizes.end()) - sizes.begin();
         size_t out_len = sizes[codec];
 
-        // Encode using the 'winner' codec (bit-packing deferred until now).
+        // Encode using the 'winner' codec (bit-packing and interpolative deferred until now).
         if (codec == block_bit_packing) {
             BitPackingBlockCodec::encode(in, sum_of_values, n, out);
+        } else if (codec == block_interpolative) {
+            interpolative_block::encode(in, sum_of_values, n, out);
         } else {
             out.insert(out.end(), encoded[codec].data(), encoded[codec].data() + encoded[codec].size());
         }
