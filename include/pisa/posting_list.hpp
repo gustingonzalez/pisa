@@ -57,6 +57,7 @@ enum CodecTypes {
     block_interpolative,
     block_all_ones,
     block_bit_packing,
+    block_rle,
 
     // Codecs below are used as fallback in order to read posting lists
     // having only a single element. Note that no overhead is required
@@ -112,6 +113,7 @@ static decoder decoders[]{
     interpolative_block::decode,
     all_ones_block::decode,
     BitPackingBlockCodec::decode,
+    rle_block::decode,
     // Note that 'dummy parameters' are used (i.e. 'size_t') to allow generic
     // calls when decoding, such as: decoders[codec].decode(in, out, s, n)
     [](uint8_t const* in, uint32_t* out, uint32_t sum_of_values, size_t) {
@@ -139,6 +141,7 @@ inline auto codec_id_to_name(uint8_t codec) -> std::string_view
         map[block_interpolative] = "block_interpolative";
         map[block_all_ones] = "block_all_ones";
         map[block_bit_packing] = "block_bit_packing";
+        map[block_rle] = "block_rle";
         map[single_dummy] = "single_dummy";
         map[single_vbyte] = "single_vbyte";
         return map;
@@ -276,8 +279,8 @@ struct posting_list {
             return {block_all_ones, 0};
         }
 
-        // Encodeds of 'in' (except bit-packing which defers encoding).
-        constexpr auto codec_count = block_bit_packing + 1;
+        // Encodeds of 'in' (except bit-packing, interpolative, and RLE which defer encoding).
+        constexpr auto codec_count = block_rle + 1;
         std::vector<std::vector<uint8_t>> encoded(codec_count);
 
         // Starts encodes sizes in the max possible value.
@@ -310,8 +313,9 @@ struct posting_list {
         }
 
         // Encoders that don't need a special number of integers.
-        // Precompute interpolative size without encoding (optimization)
+        // Precompute interpolative and RLE sizes without encoding (optimization)
         sizes[block_interpolative] = interpolative_block::compute_encoded_size(in, sum_of_values, n);
+        sizes[block_rle] = rle_block::compute_encoded_size(in, n);
         encode_with<StreamVByteBlockCodec>(in, sum_of_values, n, encoded[block_streamvbyte]);
         encode_with<MaskedVByteBlockCodec>(in, sum_of_values, n, encoded[block_maskedvbyte]);
         encode_with<Simple8bBlockCodec>(in, sum_of_values, n, encoded[block_simple8b]);
@@ -330,11 +334,13 @@ struct posting_list {
         uint8_t codec = std::min_element(sizes.begin(), sizes.end()) - sizes.begin();
         size_t out_len = sizes[codec];
 
-        // Encode using the 'winner' codec (bit-packing and interpolative deferred until now).
+        // Encode using the 'winner' codec (bit-packing, interpolative, and RLE deferred until now).
         if (codec == block_bit_packing) {
             BitPackingBlockCodec::encode(in, sum_of_values, n, out);
         } else if (codec == block_interpolative) {
             interpolative_block::encode(in, sum_of_values, n, out);
+        } else if (codec == block_rle) {
+            rle_block::encode(in, sum_of_values, n, out);
         } else {
             out.insert(out.end(), encoded[codec].data(), encoded[codec].data() + encoded[codec].size());
         }

@@ -8,6 +8,7 @@
 
 #include "FastPFor/headers/simple16.h"
 
+#include "codec/block_codecs.hpp"
 #include "codec/simple16.hpp"
 
 namespace pisa {
@@ -275,5 +276,182 @@ struct many_ones_block {
         return in;
     }
 };
+
+/**
+ * Run Length Encoding:
+ * - Uses the first value to inject a bit flag to distinguish two cases:
+ *   - all_same value
+ *   - multiple runs
+ * - Uses LSB of first VByte-encoded number as a flag. This avoid using one byte
+ * for header.
+ * - Even value (LSB=0): all_same case, stores value*2
+ * - Odd value (LSB=1): multi-run case, stores ((run_count-1)*2 + 1)
+ *
+ * This saves 1 byte compared to explicit header while maintaining correctness:
+ * - run_count is at most 128 (block size), so (run_count-1)*2+1 = 255 max (no overflow)
+ * - Storing (run_count-1) instead of run_count saves encoding space since minimum is 1
+ * - Values can theoretically reach 2^32-1, but multiplying by 2 could overflow
+ * - In practice, values are gap-encoded docIDs (typically < 100K) or frequencies (< 10K)
+ * - Maximum safe value for all_same encoding: 2^31-1 (2,147,483,647)
+ * - Values >= 2^31 would overflow when doubled, but are extremely rare in real data
+ * - If overflow occurs, codec selection will favor other codecs anyway
+ */
+struct rle_block {
+    static constexpr std::uint64_t block_size = 128;
+
+    /**
+     * Computes exact encoded size without actually encoding.
+     * Returns SIZE_MAX if RLE is not beneficial.
+     */
+    static std::size_t compute_encoded_size(std::uint32_t const* in, std::size_t n) {
+        if (n == 0) {
+            return SIZE_MAX;
+        }
+
+        // Check if all same value (optimal case)
+        bool all_same = std::all_of(in + 1, in + n, [first = in[0]](uint32_t v) {
+            return v == first;
+        });
+
+        if (all_same) {
+            // Just VByte(value * 2), no header byte
+            // Doubling adds at most 1 bit, minimal impact on VByte size
+            std::size_t vbyte_size = compute_vbyte_size(in[0] << 1);
+            return vbyte_size;
+        }
+
+        // Count runs for general case
+        std::uint32_t run_count = 1;
+        for (std::size_t i = 1; i < n; ++i) {
+            if (in[i] != in[i - 1]) {
+                ++run_count;
+            }
+        }
+
+        // Compute exact encoded size
+        // First number encodes ((run_count - 1) * 2 + 1) to signal multi-run case
+        std::size_t size = compute_vbyte_size(((run_count - 1) << 1) | 1);
+
+        std::uint32_t current_run_length = 1;
+        for (std::size_t i = 1; i < n; ++i) {
+            if (in[i] == in[i - 1]) {
+                ++current_run_length;
+            } else {
+                size += compute_vbyte_size(current_run_length - 1);
+                size += compute_vbyte_size(in[i - 1]);
+                current_run_length = 1;
+            }
+        }
+        // Last run
+        size += compute_vbyte_size(current_run_length - 1);
+        size += compute_vbyte_size(in[n - 1]);
+
+        return size;
+    }
+
+    static void encode(
+        std::uint32_t const* in,
+        std::uint32_t /* sum_of_values */,
+        std::size_t n,
+        std::vector<std::uint8_t>& out
+    ) {
+        // Note: `n = 0` is not possible in multicompression context.
+        // if (n == 0) {
+        //    return;
+        // }
+
+        // Check if all values are the same
+        bool all_same = std::all_of(in + 1, in + n, [first = in[0]](uint32_t v) {
+            return v == first;
+        });
+
+        if (all_same) {
+            // Optimal case: all same value
+            // Encode value*2 with LSB=0 to signal all_same case
+            TightVariableByte::encode_single(in[0] << 1, out);
+            return;
+        }
+
+        // General case: encode runs
+        // Count runs
+        std::uint32_t run_count = 1;
+        for (std::size_t i = 1; i < n; ++i) {
+            if (in[i] != in[i - 1]) {
+                ++run_count;
+            }
+        }
+
+        // Encode ((run_count - 1)*2 + 1) with LSB=1 to signal multi-run case
+        TightVariableByte::encode_single(((run_count - 1) << 1) | 1, out);
+
+        // Encode each run as (length-1, value)
+        std::uint32_t current_run_length = 1;
+        for (std::size_t i = 1; i < n; ++i) {
+            if (in[i] == in[i - 1]) {
+                ++current_run_length;
+            } else {
+                TightVariableByte::encode_single(current_run_length - 1, out);
+                TightVariableByte::encode_single(in[i - 1], out);
+                current_run_length = 1;
+            }
+        }
+
+        // Emit last run
+        TightVariableByte::encode_single(current_run_length - 1, out);
+        TightVariableByte::encode_single(in[n - 1], out);
+    }
+
+    static std::uint8_t const* decode(
+        std::uint8_t const* in,
+        std::uint32_t* out,
+        std::uint32_t /* sum_of_values */,
+        std::size_t n
+    ) {
+        if (n == 0) {
+            return in;
+        }
+
+        // Read first VByte-encoded number and check LSB for case discrimination
+        std::uint32_t first_value;
+        in = TightVariableByte::decode(in, &first_value, 1);
+
+        if ((first_value & 1) == 0) {
+            // LSB = 0: all_same case
+            // Recover original value by dividing by 2 (right shift)
+            std::uint32_t value = first_value >> 1;
+            std::fill_n(out, n, value);
+            return in;
+        }
+
+        // LSB = 1: multi-run case
+        // Recover run_count by dividing by 2 (right shift) and adding 1
+        std::uint32_t run_count = (first_value >> 1) + 1;
+
+        std::size_t decoded = 0;
+        for (std::uint32_t r = 0; r < run_count; ++r) {
+            std::uint32_t run_length_minus_1;
+            std::uint32_t value;
+
+            in = TightVariableByte::decode(in, &run_length_minus_1, 1);
+            in = TightVariableByte::decode(in, &value, 1);
+
+            std::uint32_t run_length = run_length_minus_1 + 1;
+            std::fill_n(out + decoded, run_length, value);
+            decoded += run_length;
+        }
+
+        return in;
+    }
+
+  private:
+    static std::size_t compute_vbyte_size(std::uint32_t value) {
+        if (value < (1U << 7)) return 1;
+        if (value < (1U << 14)) return 2;
+        if (value < (1U << 21)) return 3;
+        if (value < (1U << 28)) return 4;
+        return 5;
+    }
+};
+
 
 }  // namespace pisa
