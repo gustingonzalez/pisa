@@ -10,6 +10,7 @@
 
 #include "codec/block_codecs.hpp"
 #include "codec/simple16.hpp"
+#include "codec/block_codecs.hpp"
 
 namespace pisa {
 struct BitPackingBlockCodec {
@@ -278,23 +279,37 @@ struct many_ones_block {
 };
 
 /**
- * Run Length Encoding:
- * - Uses the first value to inject a bit flag to distinguish two cases:
- *   - all_same value
- *   - multiple runs
- * - Uses LSB of first VByte-encoded number as a flag. This avoid using one byte
- * for header.
- * - Even value (LSB=0): all_same case, stores value*2
- * - Odd value (LSB=1): multi-run case, stores ((run_count-1)*2 + 1)
+ * Run Length Encoding, with some optimizations.
  *
- * This saves 1 byte compared to explicit header while maintaining correctness:
- * - run_count is at most 128 (block size), so (run_count-1)*2+1 = 255 max (no overflow)
- * - Storing (run_count-1) instead of run_count saves encoding space since minimum is 1
- * - Values can theoretically reach 2^32-1, but multiplying by 2 could overflow
- * - In practice, values are gap-encoded docIDs (typically < 100K) or frequencies (< 10K)
- * - Maximum safe value for all_same encoding: 2^31-1 (2,147,483,647)
- * - Values >= 2^31 would overflow when doubled, but are extremely rare in real data
- * - If overflow occurs, codec selection will favor other codecs anyway
+ * Format uses LSB of first encoded number as bit flag:
+ * - LSB=0, indicates all the values in the packed are the same.
+ *   Example: [2,2,2,2] (n=4) => encode(2<<1) => encode(3)
+ *   Decode: value = 3>>1 = 2, filling `n` positions with value 2.
+ *
+ * - LSB=1 (multi-run): Encode (first_run_length-1)<<1 | 1 setting LSB=1
+ *   Then store first run value, followed by (run_length-1, value) pairs
+ *   for all remaining runs.
+ *     Example: [2,2,3,3,3] (n=5) =>
+ *       encode((2-1)<<1|1) → encode(3)  # Header with first run length
+ *       encode(2)                       # First run value (length in header)
+ *       encode(3-1)                     # Second run length-1
+ *       encode(3)                       # Second run value
+ *
+ * Key optimizations:
+ * - LSB flag: saves 1 byte vs. comparing to an explicit header.
+ * - Store (length-1), because minimum run is 1, so saving bits.
+ *
+ * Overflow considerations:
+ * - all_same max safe value: teorically is 2^31-1, but there is not a problem,
+ * because is used VariableByte (<<1 could overflow beyond this)
+ * 
+ * Considerations:
+ * Key insight: The << 1 shift causes an extra VByte byte when the original
+ *  value is in the upper half of a
+ *  7-bit boundary range (e.g., 64-127, 8192-16383, etc.); but this will be the
+ *  same
+ * saving 1 byte as header; but shift approach is equal or better in most
+ *  cases.
  */
 struct rle_block {
     static constexpr std::uint64_t block_size = 128;
@@ -313,38 +328,43 @@ struct rle_block {
             return v == first;
         });
 
+        // All same case.
         if (all_same) {
-            // Just VByte(value * 2), no header byte
-            // Doubling adds at most 1 bit, minimal impact on VByte size
             std::size_t vbyte_size = compute_vbyte_size(in[0] << 1);
             return vbyte_size;
         }
 
-        // Count runs for general case
-        std::uint32_t run_count = 1;
-        for (std::size_t i = 1; i < n; ++i) {
-            if (in[i] != in[i - 1]) {
-                ++run_count;
-            }
+        // Multi-run case
+        std::uint32_t first_value = in[0];
+        std::uint32_t first_run_length = 1;
+        std::size_t i = 1;
+
+        // Find end of first run
+        while (i < n && in[i] == first_value) {
+            ++first_run_length;
+            ++i;
         }
 
-        // Compute exact encoded size
-        // First number encodes ((run_count - 1) * 2 + 1) to signal multi-run case
-        std::size_t size = compute_vbyte_size(((run_count - 1) << 1) | 1);
+        // Header: (first_run_length - 1) << 1 | 1
+        std::size_t size = compute_vbyte_size(((first_run_length - 1) << 1) | 1);
 
-        std::uint32_t current_run_length = 1;
-        for (std::size_t i = 1; i < n; ++i) {
-            if (in[i] == in[i - 1]) {
+        // First run value (length in header)
+        size += compute_vbyte_size(first_value);
+
+        // Remaining runs: each as (length-1, value)
+        while (i < n) {
+            std::uint32_t current_value = in[i];
+            std::uint32_t current_run_length = 1;
+            ++i;
+
+            while (i < n && in[i] == current_value) {
                 ++current_run_length;
-            } else {
-                size += compute_vbyte_size(current_run_length - 1);
-                size += compute_vbyte_size(in[i - 1]);
-                current_run_length = 1;
+                ++i;
             }
+
+            size += compute_vbyte_size(current_run_length - 1);
+            size += compute_vbyte_size(current_value);
         }
-        // Last run
-        size += compute_vbyte_size(current_run_length - 1);
-        size += compute_vbyte_size(in[n - 1]);
 
         return size;
     }
@@ -367,38 +387,42 @@ struct rle_block {
 
         if (all_same) {
             // Optimal case: all same value
-            // Encode value*2 with LSB=0 to signal all_same case
+            // Encode value<<1 with LSB=0 to signal all_same case
             TightVariableByte::encode_single(in[0] << 1, out);
             return;
         }
 
-        // General case: encode runs
-        // Count runs
-        std::uint32_t run_count = 1;
-        for (std::size_t i = 1; i < n; ++i) {
-            if (in[i] != in[i - 1]) {
-                ++run_count;
-            }
+        // Multi-run case: find first run length and encode directly
+        std::uint32_t first_value = in[0];
+        std::uint32_t first_run_length = 1;
+        std::size_t i = 1;
+
+        // Scan to find end of first run
+        while (i < n && in[i] == first_value) {
+            ++first_run_length;
+            ++i;
         }
 
-        // Encode ((run_count - 1)*2 + 1) with LSB=1 to signal multi-run case
-        TightVariableByte::encode_single(((run_count - 1) << 1) | 1, out);
+        // Encode header: (first_run_length - 1) << 1 | 1 to set LSB=1 flag
+        TightVariableByte::encode_single(((first_run_length - 1) << 1) | 1, out);
 
-        // Encode each run as (length-1, value)
-        std::uint32_t current_run_length = 1;
-        for (std::size_t i = 1; i < n; ++i) {
-            if (in[i] == in[i - 1]) {
-                ++current_run_length;
-            } else {
-                TightVariableByte::encode_single(current_run_length - 1, out);
-                TightVariableByte::encode_single(in[i - 1], out);
-                current_run_length = 1;
+        // Encode first run value (length already in header)
+        TightVariableByte::encode_single(first_value, out);
+
+        // Encode remaining runs: each as (length-1, value).
+        while (i < n) {
+            std::uint32_t current_value = in[i];
+            std::uint32_t current_run_length_minus_1 = 0;
+            ++i;
+
+            // Check for equal values for this run.
+            while (i < n && in[i] == current_value) {
+                ++current_run_length_minus_1;
+                ++i;
             }
+            TightVariableByte::encode_single(current_run_length_minus_1, out);
+            TightVariableByte::encode_single(current_value, out);
         }
-
-        // Emit last run
-        TightVariableByte::encode_single(current_run_length - 1, out);
-        TightVariableByte::encode_single(in[n - 1], out);
     }
 
     static std::uint8_t const* decode(
@@ -412,23 +436,30 @@ struct rle_block {
         }
 
         // Read first VByte-encoded number and check LSB for case discrimination
-        std::uint32_t first_value;
-        in = TightVariableByte::decode(in, &first_value, 1);
+        std::uint32_t header_value;
+        in = TightVariableByte::decode(in, &header_value, 1);
 
-        if ((first_value & 1) == 0) {
+        if ((header_value & 1) == 0) {
             // LSB = 0: all_same case
-            // Recover original value by dividing by 2 (right shift)
-            std::uint32_t value = first_value >> 1;
+            // Recover original value by right shift
+            std::uint32_t value = header_value >> 1;
             std::fill_n(out, n, value);
             return in;
         }
 
         // LSB = 1: multi-run case
-        // Recover run_count by dividing by 2 (right shift) and adding 1
-        std::uint32_t run_count = (first_value >> 1) + 1;
+        // Header encodes (first_run_length - 1), recover it
+        std::uint32_t first_run_length = (header_value >> 1) + 1;
 
-        std::size_t decoded = 0;
-        for (std::uint32_t r = 0; r < run_count; ++r) {
+        // Decode first run (value only, length is in header)
+        std::uint32_t first_value;
+        in = TightVariableByte::decode(in, &first_value, 1);
+        std::fill_n(out, first_run_length, first_value);
+
+        std::size_t decoded = first_run_length;
+
+        // Decode remaining runs (each has length-1 and value)
+        while (decoded < n) {
             std::uint32_t run_length_minus_1;
             std::uint32_t value;
 

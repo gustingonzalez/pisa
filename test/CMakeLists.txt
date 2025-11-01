@@ -26,4 +26,14 @@ endforeach(TEST_SRC)
 target_link_libraries(test_intersection testlib)
 target_link_libraries(test_cursors testlib)
 
+# Standalone benchmarks
+add_executable(final_rle_comparison final_rle_comparison.cpp)
+target_link_libraries(final_rle_comparison pisa)
+
+add_executable(benchmark_rle_old_vs_new benchmark_rle_old_vs_new.cpp)
+target_link_libraries(benchmark_rle_old_vs_new pisa)
+
+add_executable(final_comparison_all_three final_comparison_all_three.cpp)
+target_link_libraries(final_comparison_all_three pisa)
+
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/test_data DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
